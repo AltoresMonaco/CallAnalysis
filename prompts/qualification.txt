@@ -1,0 +1,17 @@
+Dans le cadre de cet appel, fournit moi un JSON :
+
+- Le résumé de l'appel en 4 à 6 sentences ("summary")
+- La qualification de l'appel ("isPositive?" -> true/false)
+- La détection de la réitération en numéraire ("hasVisitedShop", "technicianVisitedCustomer", "previousCalls")
+
+Critères positifs :
+- Réponse claire, même différée
+- Ton cordial
+- Expression de satisfaction
+
+Critères négatifs :
+- Aucune solution claire
+- Ton froid
+- Frustration exprimée
+
+Détection de réitération : visites, rappels, etc. 

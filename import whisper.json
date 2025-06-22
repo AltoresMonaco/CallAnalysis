@@ -1,0 +1,3014 @@
+import whisper
+import subprocess
+import json
+import requests
+import sys
+from pathlib import Path
+
+# ---- Config ----
+OLLAMA_MODEL = "llama3"  # change if using another model locally
+OLLAMA_URL = "http://localhost:11434/api/generate"
+PROMPT_QUALIFICATION = """
+Dans le cadre de cet appel, fournit moi un JSON :
+
+- Le résumé de l’appel en 4 à 6 phrases ("summary")
+- La qualification de l’appel ("isPositive?" -> true/false)
+- La détection de la réitération en numéraire ("hasVisitedShop", "technicianVisitedCustomer", "previousCalls")
+
+Critères positifs :
+- Réponse claire, même différée
+- Ton cordial
+- Expression de satisfaction
+
+Critères négatifs :
+- Aucune solution claire
+- Ton froid
+- Frustration exprimée
+
+Détection de réitération : visites, rappels, etc.
+"""
+
+PROMPT_CRITICAL_ISSUES = """
+Out of the full non-diarized transcript of the call sent to you, is there any very serious/important issue that would matter to directors of the customer care?
+
+Provide:
+- list of {"issue": ..., "relevance": ...}
+- related keywords
+Output only JSON, no text.
+"""
+
+PROMPT_TYPING = """
+Dans le cadre de cet appel, fournit moi un JSON qui catégorise le ou les sujets de l'appel selon les typologies commerciales et techniques les plus justes.
+[
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Renseignement commercial sur appareils mobile",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Renseignement commercial sur offres/options mobile",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Renseignement commercial sur SMS Court/ Push",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Voip",
+    "categorie_operationnelle_3": "Renseignement commercial sur VoIP",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Renseignement commercial relatif à MTTV",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Renseignement commercial sur TV Docsis",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre/options internet Docsis",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Mails/NDD",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre Mails/NDD",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre/options Fibre",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre/options Trunksip",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Legacy Internet",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre/options Legacy Internet",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Legacy Fixe",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre/options Legacy Fixe",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre Connectivity",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement commercial",
+    "categorie_operationnelle_2": "Hebergement/Cloud",
+    "categorie_operationnelle_3": "Renseignement commercial sur offre Hebergement/Cloud",
+    "description": "\"Demande d'information sur les offres tarifaires"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Changement d'offre mobile (upgrade / downgrade)",
+    "description": "Lorsque le client souhaite un forfait plus ou moins cher"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Ajout / suppression d'option mobile",
+    "description": "\"Lorsque le cleint souhaite souscrire une option mobile (appels illimités"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Résiliation d'offre mobile",
+    "description": "Résiliation d'un forfait mobile"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Souscription offre mobile",
+    "description": "Souscription d'un forfait mobile"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Souscription offre MTTV",
+    "description": "Souscription offre MTTV (application Monaco Telecom TV)"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Résiliation offre MTTV",
+    "description": "Résiliation de l'offre MTTV  (application Monaco Telecom TV)"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Location Apple TV",
+    "description": "Location d'une Apple TV"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Restitution Apple TV",
+    "description": "Restitution d'une Apple TV"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Souscription de pack de chaînes MTTV",
+    "description": "Souscription de pack de chaînes de l'appli MTTV"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Résiliation de pack de chaînes MTTV",
+    "description": "Résiliation de pack de chaînes de l'appli MTTV"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Souscription box Docsis additionnelle",
+    "description": "Souscription d'une box internet Docsis additionnelle"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Résiliation box Docsis additionnelle",
+    "description": "Résiliation d'une box internet Docsis additionnelle"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Souscription pack TV Docsis",
+    "description": "Souscription d'un pack de chaînes TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Résiliation pack TV Docsis",
+    "description": "Résiliation d'un pack de chaînes TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Déplacement / ajout prise TV Docsis",
+    "description": "Déplacement / ajout d'une prise TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Changement Offre/Ajout suppression option internet Docsis",
+    "description": "Changement Offre/Ajout suppression d'une option internet Docsis"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Déplacement / ajout de prise internet Docsis",
+    "description": "Lorsque le client souhaite déplacer ou ajouter une prise internet Docsis à son domicile"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Souscription Offre Docsis",
+    "description": "Souscription d'une Offre Internet Docsis"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Résiliation Offre Docsis",
+    "description": "Résiliation d'une Offre Internet Docsis"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Mails/NDD",
+    "categorie_operationnelle_3": "Résiliation offre mails/NDD",
+    "description": "Résiliation d'une offre de messagerie ou nom de domaine"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Mails/NDD",
+    "categorie_operationnelle_3": "Souscription offre mails/NDD",
+    "description": "Souscription d'une offre de messagerie ou nom de domaine"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Changement offre fibre",
+    "description": "Changement d'offre Internet fibre"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Ajout/Suppression option fibre",
+    "description": "Ajout/Suppression d'option sur une box Internet fibre"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Déplacement prise fibre",
+    "description": "Déplacement d'une prise Internet fibre"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Souscription Offre Fibre",
+    "description": "Souscription d'une Offre Internet Fibre"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Résiliation Offre Fibre",
+    "description": "Résiliationd'une Offre Internet Fibre"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Souscription Offre Trunksip",
+    "description": "Souscription d'une Offre Trunksip (standard téléphonique sur IP)"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Résiliation Offre Trunksip",
+    "description": "Résiliation d'une Offre Trunksip (standard téléphonique sur IP)"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Modification Offre Trunksip",
+    "description": "Modification d'une Offre Trunksip (standard téléphonique sur IP)"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Legacy Internet",
+    "categorie_operationnelle_3": "Résiliation offre/option Legacy Internet",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Legacy Internet",
+    "categorie_operationnelle_3": "Souscription offre/option Legacy Internet",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Legacy Fixe",
+    "categorie_operationnelle_3": "Résiliation offre/option Legacy Fixe",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Legacy Fixe",
+    "categorie_operationnelle_3": "Souscription offre/option Legacy Fixe",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "Souscription Offre Connectivity",
+    "description": "\"Souscription d'une Offre Connectivity"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "Modification offre Connectivity",
+    "description": "\"Modification d'une offre Connectivity"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "Résiliation Offre Connectivity",
+    "description": "\"Résiliation d'une Offre Connectivity"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Hebergement/Cloud",
+    "categorie_operationnelle_3": "Souscription Offre Hébergement/Cloud",
+    "description": "Souscription d'une Offre Hébergement en data center ou  de service Cloud"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte commercial",
+    "categorie_operationnelle_2": "Hebergement/Cloud",
+    "categorie_operationnelle_3": "Résiliation Offre Hébergement/Cloud",
+    "description": "Résiliation d'une Offre d'hébergement en data center ou  de service Cloud"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Renseignement procédure déménagement",
+    "description": "Lorsque le client souhaite connaître les démarches relatives au changement d'adresse"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Renseignement procédure cession-reprise contrat",
+    "description": "Renseignement sur les modalités de cession-reprise d'un contrat"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Renseignement procédure changement nom",
+    "description": "Renseignement sur la démarche à effectuer pour modifier un nom de famille"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Confirmation présence annuaire",
+    "description": "Cherche à vérifier si mes coordonées figurent bien dans l'annuaire"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Demande code Pin/Puk mobile",
+    "description": "Demande code Pin/Puk mobile pour dévérouiller le téléphone"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Renseignement sur état compte client/offre(s)",
+    "description": "Cherche à connaître les offres souscrites et les tarifs associés à un compte client"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Information sur RDV",
+    "description": "Demande confirmation de la date et heure du rendez-vous"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Information sur Monaco Care Mobile",
+    "description": "\"Information sur l'offre d'assurance Mobile \"\"Monaco Care Mobile\"\"\""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Renseignement sur procédure de résiliation",
+    "description": "Cherche à connaître les modalités de résiliation d'offre Mobile ou internet"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Aide / renseignement administratif",
+    "categorie_operationnelle_2": "Aide / renseignement administratif",
+    "categorie_operationnelle_3": "Aide signature électronique",
+    "description": "A besoin d'explications pour pouvoir utiliser la signature électronique"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Déménagement contrat client",
+    "description": "Mise à jour informatique à la suite du déménagement d'un client (changement de coordonnées)"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Cession-reprise d'un contrat",
+    "description": "Mise à jour informatique pour acter la cession d'un contrat à une autre personne"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Cession-reprise ligne(s) mobile",
+    "description": "Mise à jour informatique pour acter la cession d'une ligne Mobile à une autre personne"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Changement de nom",
+    "description": "Mise à jour informatique avec le nouveau nom du client"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Modification informations annuaires",
+    "description": "Mise à jour informatique actant le changement de coordonnées parues dans l'annuaire"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Suspension/Réactivation ligne mobile",
+    "description": "Mise à jour informatique actant la suspension ou la réactivation d'une ligne mobile"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Modification de RDV",
+    "description": "Mise à jour informatique actant la modification de la date ou heure d'un rendez-vous client"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Activation / Changement eSIM",
+    "description": "Mise à jour informatique actant l'activation d'une carte SIM électronique ou son remplacement"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Activation / Changement SIM",
+    "description": "Mise à jour informatique actant l'activation d'une carte SIM physique ou son remplacement"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Ajout/Suppression Mandataire",
+    "description": "Mise à jour informatique actant la présence d'un mandataire associé au compte d'un client ou sa suppression"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Acte administratif",
+    "categorie_operationnelle_2": "Acte administratif",
+    "categorie_operationnelle_3": "Archivage contrat signé",
+    "description": "Mise à jour informatique actant de l'archivage d'un contrat signé"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Hors périmètre",
+    "categorie_operationnelle_3": "Hors périmètre",
+    "description": "\"Tout ce qui ne rentre pas dans l'une des catégories/Tout ce qui ne concerne pas le périmètre d'activité de Monaco Telecom (ex : Canal+"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "Orange",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande commerciale d'un client Orange et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "Bouygues",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande commerciale d'un client Bouygues Telecom et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "Free",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande commerciale d'un client Free et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "SFR",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande commerciale d'un client SFR et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Demande relative au règlement de la facture",
+    "categorie_operationnelle_3": "Information sur solde dû",
+    "description": "Lorsque le client cherche à savoir ce qu'il a à payer"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Demande relative au règlement de la facture",
+    "categorie_operationnelle_3": "Demande confirmation réception paiement",
+    "description": "Lorsque le client cherche à savoir si nous avons bien reçu son règlement"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Demande relative au règlement de la facture",
+    "categorie_operationnelle_3": "Envoi lien de paiement",
+    "description": "Lorsque le conseiller renvoie le lien qui permet au client de régler en ligne par carte bleue"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Demande relative au règlement de la facture",
+    "categorie_operationnelle_3": "Modification RIB existant",
+    "description": "\"Lorsque le client demande à modifier son RIB"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Demande relative au règlement de la facture",
+    "categorie_operationnelle_3": "Changement mode de paiement",
+    "description": "\"Lorsque le client souhaite payer d'une autre façon (prélèvement"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Demande relative au règlement de la facture",
+    "categorie_operationnelle_3": "Demande de délai paiement / échéancier",
+    "description": "Lorsque le client a des difficultés financières et qu'il demande un délai de paiement avec échéancier éventuel"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Explication de facture",
+    "categorie_operationnelle_3": "Explication première facture suite souscription / migration",
+    "description": "Lorsque le client ne comprend pas sa première facture et demande des explications"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Explication de facture",
+    "categorie_operationnelle_3": "Explication facture de clôture",
+    "description": "Lorsque le client ne comprend pas sa facture de clôture et demande des explications"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Explication de facture",
+    "categorie_operationnelle_3": "Explication Hors forfait/ Daily Pass",
+    "description": "\"Lorsque le client ne comprend pas pourquoi il a été facturé de Daily Pass ou de communications  hors forfait"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Explication de facture",
+    "categorie_operationnelle_3": "Explication de facture autre",
+    "description": "Lorsque le client ne comprend pas sa facture et demande des explications"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Facturation",
+    "categorie_operationnelle_2": "Demande de duplicata de factures",
+    "categorie_operationnelle_3": "Demande de duplicata de factures",
+    "description": "Lorsque le client n'a plus accès à sa facture et souhaite une copie"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Réclamation",
+    "categorie_operationnelle_2": "Réclamation",
+    "categorie_operationnelle_3": "Réclamation Daily Pass",
+    "description": "Lorsque le client conteste la facturation de Daily Pass malgrè les explications fournies"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Réclamation",
+    "categorie_operationnelle_2": "Réclamation",
+    "categorie_operationnelle_3": "Réclamation Autre",
+    "description": "\"Lorsque le client :"
+  },
+  {
+    "type_typologie": "réclame un dédommagement/geste commercial/remise (hors oubli de la part de Monaco Telecom)",
+    "type_incident": "",
+    "categorie_operationnelle_1": "",
+    "categorie_operationnelle_2": "",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Demande à être mis en relation avec un responsable\"",
+    "type_incident": "",
+    "categorie_operationnelle_1": "",
+    "categorie_operationnelle_2": "",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Réclamation",
+    "categorie_operationnelle_2": "Réclamation",
+    "categorie_operationnelle_3": "Réclamation Absence de consentement",
+    "description": "Lorsque le client n'a pas donné son accord concernant l'objet du litige"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Réclamation",
+    "categorie_operationnelle_2": "Réclamation",
+    "categorie_operationnelle_3": "Réclamation boutique (comportement/accueil/discours)",
+    "description": "\"Lorsque le client formule une plainte concernant l'une de nos boutiques"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Réclamation",
+    "categorie_operationnelle_2": "Réclamation",
+    "categorie_operationnelle_3": "Réclamation non-restitution équipement (sans traces MT)",
+    "description": "Lorsque le client affirme avoir rendu ses équipements et que nous n'en avons pas la preuve (aucune trace dans nos outils informatiques)"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Réclamation",
+    "categorie_operationnelle_2": "Réclamation",
+    "categorie_operationnelle_3": "Réclamation prestation technicien",
+    "description": "\"Lorsque le client formule une plainte concernant l'un de nos techniciens (travail de mauvaise qualité"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Réclamation",
+    "categorie_operationnelle_2": "Réclamation",
+    "categorie_operationnelle_3": "Réclamation qualité produit/ technologie",
+    "description": "Lorsque le client exprime son insatisfaction quant à la qualité des produits et services Monaco Telecom/technologie défaillante"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Régularisation facture (erreurs /oublis MT)",
+    "categorie_operationnelle_2": "Régularisation facture (erreurs /oublis MT)",
+    "categorie_operationnelle_3": "Régularisation facture (erreurs /oublis MT)",
+    "description": "Lorque le client signale une erreur ou un oubli sur une facture"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Campagne appels sortants",
+    "categorie_operationnelle_2": "Campagne Pré-Installation Fibre",
+    "categorie_operationnelle_3": "Campagne Pré-Installation Fibre",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Accès Data Center",
+    "categorie_operationnelle_2": "Création Badge Permanent et/ou Administrateur",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Accès Data Center",
+    "categorie_operationnelle_2": "Création Badge Temporaire",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Accès Data Center",
+    "categorie_operationnelle_2": "Demande Rapport/Listing Accès",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Accès Data Center",
+    "categorie_operationnelle_2": "Modification Droit Accès",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Accès Data Center",
+    "categorie_operationnelle_2": "Suppression Badge Permanent et/ou Administrateur",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Accès Site Radio/Opérateur",
+    "categorie_operationnelle_2": "Accès Opérateur",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Com",
+    "type_incident": "Demande de service utilisateur",
+    "categorie_operationnelle_1": "Accès Site Radio/Opérateur",
+    "categorie_operationnelle_2": "Site Radio",
+    "categorie_operationnelle_3": "",
+    "description": ""
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Activation données en itinérance",
+    "description": "Demande d’activation de l’accès aux données mobiles lors de déplacements à l’étranger (itinérance)."
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "AAU Configuration APN",
+    "description": "Demande d’assistance pour la configuration manuelle ou automatique des paramètres APN sur un appareil mobile."
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Aide paramétrage messagerie vocale (888/VVM)",
+    "description": "Demande d’assistance pour la configuration du répondeur"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Aide à l’utilisation smartphone",
+    "description": "Demande d’assistance à l'utilisation d'un téléphone mobile"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "AAU Terminal Mobile ou SIM cassé/défectueux",
+    "description": "Lorsque la carte SIM du client est défectueuse"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Reboot",
+    "description": "Lorsque la problématique du client relative à son  téléphone mobile est corrigée par son redémarrage"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Réinitialisation réglages réseaux",
+    "description": "Lorsque la problématique du client relative à ses appels ou téléphone est corrigé par la réinitialisation des réglages réseaux"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU APPLE TV / Reboot / Réinitialisation",
+    "description": "Lorsque la problématique du client relative à l'Apple TV est corrigé par son redémarrage  ou réinitialisation"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU Apple TV (source…)",
+    "description": "Lorsque la problématique du client relative à  l'Apple TV est corrigée par le changement de source TV ou une vérification des branchements"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU APPLE TV / Mise à jour logiciel",
+    "description": "Lorsque la problématique du client relative à  l'Apple TV est corrigée par sa mise à jour logicielle"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU APPLE TV / Navigation télécommande",
+    "description": "Lorsque le client ne sait pas utiliser la télécommande de l'Apple TV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU APPLE TV / Télécommande Cassée/Défectueuse",
+    "description": "Lorsque la télécommande de l'Apple TV est casséé ou défectueuse"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU Apple TV pour appli IPTV (Netflix…)",
+    "description": "\"Lorsque le client a besoin d'assistance relative à une appli autre que MTTV (Canal+"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU application MTTV",
+    "description": "Lorsque le client a besoin d'assistance relative à l'appli MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU MTTV accès aux chaînes",
+    "description": "Lorsque le client a besoin d'assistance pour savoir comment accèder aux chaînes sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU MTTV enregistrer un programme / Replay",
+    "description": "Lorsque le client a besoin d'assistance pour savoir comment enregistrer un programme ou regarder un replay sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "AAU MTTV guide des programmes",
+    "description": "Lorsque le client a besoin d'assistance pour savoir comment accèder au guide des programmes sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Accès aux chaînes - AAU TV (Docsis / SU)",
+    "description": "Lorsque le client a besoin d'assistance pour savoir comment accèder aux chaînes sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "\"Assistance TV (Docsis / SU) (source",
+    "description": "branchement)\""
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Contrôle du direct - AAU TV (Docsis / SU)",
+    "description": "Lorsque le client a besoin qu'on lui explique comment retrouver la lecture de son programme en direct"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Enregistrer un programme - AAU TV (Docsis / SU)",
+    "description": "Lorsque le client a besoin d'assistance pour savoir comment enregistrer un programme ou regarder un replay sur sa TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Service VOD - AAU TV (Docsis / SU)",
+    "description": "Lorsque le client a besoin d'assistance pour savoir comment accèder au service de Vidéo à la Demande"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Guide des programmes - AAU TV (Docsis / SU)",
+    "description": "Lorsque le client a besoin d'assistance pour savoir comment accèder au guide des programmes sur TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Télécommande - AAU TV (Docsis / SU)",
+    "description": "Lorsque la télécommande de la TV Doscis ou Service Universel est casséé ou défectueuse ou s'il a besoin d'assistance pour utiliser la télécommande"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "AAU Branchements/Jaretières (Box Fibre)",
+    "description": "Lorsque la problématique du client relative à  sa box Fibre est corrigée par la vérification des branchements"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "AAU Connexion Wifi (Box Fibre)",
+    "description": "Lorsque la problématique du client relative à  sa box Fibre est corrigée par un paramétrage du wifi"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "AAU Monaco Care Safety",
+    "description": "lorsque le client a besoin d'assistance pour paramétrer son compte sur l'appli Monaco Care Safety"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "AAU VoIP (Box Fibre)",
+    "description": "Lorsque le client a besoin d'assistance relative au service de téléphonie fixe de sa box fibre"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "\"Aide paramétrage Box Fibre (NAT",
+    "description": "DMZ…)\""
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Mise en service Migration - Provisionning",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "AAU Branchements (Box Docsis)",
+    "description": "Lorsque la problématique du client relative à  sa box Docsis est corrigée par la vérification des branchements"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "AAU Connexion Wifi (Box Docsis)",
+    "description": "Lorsque la problématique du client relative à  sa box Docsis est corrigée par un paramétrage du wifi"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "AAU Monaco Care Safety",
+    "description": "Lorsque le client a besoin d'assistance pour utiliser le service Monaco Care Safety"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "AAU VoIP (Box Docsis)",
+    "description": "Lorsque le client a besoin d'assistance pour utiliser le service téléphonie fixe de sa box Docsis"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "\"Aide paramétrage Box Docsis (NAT",
+    "description": "DMZ…)\""
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Mise en service Migration - Provisionning",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "AAU Accès Webmail",
+    "description": "Lorsque le client a besoin d'aide pour savoir comment accèder au webmail"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "AAU Config Client messagerie",
+    "description": "Lorsque le client a besoin d'aide pour paramétrer son logiciel de messagerie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "AAU Service messagerie",
+    "description": "Lorsque le client a besoin d'aide pour utiliser sa messagerie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MyMT",
+    "categorie_operationnelle_3": "AAU MyMT",
+    "description": "Lorsque le client a besoin d'aide pour savoir comment accèder à son espace Client MyMT"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "AAU Trunksip",
+    "description": "Lorsque le client a besoin d'aide pour utiliser son service Trunksip (standard téléphonique sur IP)"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Nom de domaine",
+    "categorie_operationnelle_3": "Modification DNS",
+    "description": "Lorsque le client a besoin d'aide pour mettre en place des enregistrements sur son nom de domaine"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "AAU MCR",
+    "description": "Lorsque le client a besoin d'aide relative au service MCR (Monaco Care Recording)"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "AAU EVENT",
+    "description": "Lorsque le client a besoin d'aide relative à un event"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "AAU FTTY",
+    "description": "Lorsque le client a besoin d'aide relative à une connexion Internet sur un bateau"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "AAU FTTH reseau prive",
+    "description": "Lorsque le client a besoin d'aide relative à une connexion Internet Fibre sur mesure"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "AAU Hébergement",
+    "description": "\"Lorsque le client a besoin d'aide relative à son hébergement (site web"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "AAU IPTV",
+    "description": "Lorsque le client a besoin d'aide relative à une chaîne TV sur le service IPTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "AAU WIFI",
+    "description": "Lorsque le client a besoin d'aide relative à son réseau wifi privé (code)"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "AAU VPS",
+    "description": "Lorsque le client a besoin d'aide relative à son service d'herbergement site web"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "AAU IaaS",
+    "description": "Lorsque le client a besoin d'aide relative à son service d'herbergement IaaS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "AAU Data Center",
+    "description": "Lorsque le client a besoin d'aide relative à son service d'herbergement en data center"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "AAU Connectivity INTERNET",
+    "description": "\"Lorsque le client a besoin d'aide relative à sa connexion Internet Connectivity"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "AAU Connectivity LAN",
+    "description": "\"Lorsque le client a besoin d'aide relative à sa connexion Internet Connectivity LAN"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "AntiDDOS",
+    "categorie_operationnelle_3": "AAU AntiDDOS",
+    "description": "Lorsque le client a besoin d'aide relative à son service AntiDDOS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Pack Sécurité",
+    "categorie_operationnelle_3": "AAU Pack Sécurité",
+    "description": "Lorsque le client a besoin d'aide relative à son service Pack sécurité"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Legacy Internet",
+    "categorie_operationnelle_3": "AUU Xdsl",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Aide à l'usage",
+    "categorie_operationnelle_2": "Legacy Fixe",
+    "categorie_operationnelle_3": "AUU Analogique /T0/ T2",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Communication client",
+    "categorie_operationnelle_2": "OCCB",
+    "categorie_operationnelle_3": "",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Communication client",
+    "categorie_operationnelle_2": "IG",
+    "categorie_operationnelle_3": "",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Communication client",
+    "categorie_operationnelle_2": "Rapport",
+    "categorie_operationnelle_3": "",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Hors périmètre",
+    "categorie_operationnelle_3": "Hors périmètre",
+    "description": "\"Tout ce qui ne rentre pas dans l'une des catégories/Tout ce qui ne concerne pas le périmètre d'activité de Monaco Telecom (ex : Canal+"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "Orange",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande technique d'un client Orange et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "Bouygues",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande technique d'un client Bouygues Telecom et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "Free",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande technique d'un client Free et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Hors périmètre",
+    "categorie_operationnelle_2": "Opérateur Francais",
+    "categorie_operationnelle_3": "SFR",
+    "description": "Lorsqu'il s'agit d'un appel au sujet d'une demande technique d'un client SFR et non Monaco Telecom"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec accroche réseau FR",
+    "description": "Lorsque le client n'arrive pas à se connecter au réseau mobile depuis la France et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec accroche réseau MC",
+    "description": "Lorsque le client n'arrive pas à se connecter au réseau mobile depuis Monaco et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec accroche réseau Roaming (Hors MC & FR)",
+    "description": "\"Lorsque le client n'arrive pas à se connecter au réseau mobile depuis  l'étranger"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec connexion data FR",
+    "description": "Lorsque le client n'arrive pas à utiliser l'internet Mobile en France et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec connexion data MC",
+    "description": "Lorsque le client n'arrive pas à utiliser l'internet Mobile à Monaco et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec connexion data Roaming (Hors MC & FR)",
+    "description": "Lorsque le client n'arrive pas à utiliser l'internet Mobile à l'étranger (hors Monaco et France) et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission / réception SMS/MMS",
+    "description": "Lorsque le client n'arrive pas à envoyer ou recevoir des sms/MMS et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission réception appel FR",
+    "description": "Lorsque le client n'arrive pas à passer ou recevoir des appels en France et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission réception appel MC",
+    "description": "Lorsque le client n'arrive pas à passer ou recevoir des appels à Monaco et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission réception appel Roaming (Hors MC & FR)",
+    "description": "\"Lorsque le client n'arrive pas à passer ou recevoir des appels à l'étranger"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Lenteurs data mobile",
+    "description": "Lorsque le client se plaint de lenteurs ou de débits réduits lors de l'utilisation de la connexion data mobile et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "\"Problème messagerie vocale mobile (888",
+    "description": "VVM)\""
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Qualité appel mobile dégradée",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité de l'appel et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Pb Son et Image MTTV en masse",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité du son et de l'image sur MTTV et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Pb Accès chaînes MTTV en masse",
+    "description": "Lorsque le client ne parvient plus à accéder aux chaînes sur MTTV et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Pb Lancement Appli MTTV en masse",
+    "description": "Lorsque le client ne parvient plus à lancer l'appli MTTV et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Pb Fonctionnalités MTTV en masse",
+    "description": "Lorsque plusieurs fonctionnalités de MTTV dysfonctionnent et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Pb Son et Image TV Docsis en masse",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité du son et de l'image sur sa TV Docsis et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Pb Accès chaînes TV Docsis en masse",
+    "description": "Lorsque le client ne parvient plus à accéder aux chaînes sur sa TV Docsis et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Pb Fonctionnalités TV Docsis en masse",
+    "description": "Lorsque plusieurs fonctionnalités de sa TV Docsis dysfonctionnent et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Pb Accès Internet en masse (Box Fibre)",
+    "description": "Lorsque la connexion Internet de la box fibre ne fonctionne plus et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Pb VOIP en masse (Box Fibre)",
+    "description": "Lorsque le téléphone fixe de la box fibre ne fonctionne plus et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Pb WIFI en masse (Box Fibre)",
+    "description": "Lorsque le wifi de la box fibre ne fonctionne plus et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Pb Alimentation",
+    "description": "Lorsque l'alimentation électrique de la box fibre est défectueuse et que  le câble doit être remplacé à neuf"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Pb Accès Internet en masse (Box Docsis)",
+    "description": "Lorsque la connexion Internet de la box Docsis ne fonctionne plus et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Pb VOIP en masse (Box Docsis)",
+    "description": "Lorsque le téléphone fixe de la box Docsis ne fonctionne plus et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Pb WIFI en masse (Box Docsis)",
+    "description": "Lorsque le wifi de la box Docsis ne fonctionne plus et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "Accès mails KO en masse",
+    "description": "Lorsque le client ne peut plus accèder à sa boîte mail et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "Emission/réception mails KO en masse",
+    "description": "Lorsque le client accède à sa boîte mail sans pouvoir envoyer et recevoir des mails et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "Webmail KO en masse",
+    "description": "Lorsque le client ne peut plus accèder à son webmail et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MyMT",
+    "categorie_operationnelle_3": "Accès MyMT impossible en masse",
+    "description": "Lorsque le client ne peut plus accèder à son espace client en ligne MyMT et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MyMT",
+    "categorie_operationnelle_3": "Fonctionnalité(s) MyMT KO en masse",
+    "description": "Lorsque plusieurs fonctionnalités de l'espace client en ligne MyMT sont inaccessibles et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MyMT",
+    "categorie_operationnelle_3": "Lenteurs MyMT (accès ou navigation) en masse",
+    "description": "Lorsque le client met beaucoup de temps à accèder à son espace client en ligne MyMT ou que la navigation sur les différentes pages est très lente et que  le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Emission/Réception appels impossible",
+    "description": "Lorsque le client n'arrive pas à passer ou recevoir des appels depuis son service Trunksip et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Problème d'enregistrement technique",
+    "description": "Lorsque le trunksip ne s'enregistre pas et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Problème audio",
+    "description": "En cas de communication dégradée ou absence de son du trunksip et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Nom de domaine",
+    "categorie_operationnelle_3": "Service DNS KO",
+    "description": "Lorsque le service DNS ne fonctionne plus et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "Accès au portail KO",
+    "description": "Lorsque le client ne parvient pas à accéder au portail MCR et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "Pas d'appels enregistré",
+    "description": "Lorsque le client indique qu'il manque tout ou partie des enregistrements d'appels et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "Pas de SMS enregistré",
+    "description": "Lorsque le client indique qu'il manque tout ou partie des SMS et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "WIFI",
+    "description": "Lorsque l'accès au portail wifi est KO ou que le wifi ne fonctionne pas et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "IPTV",
+    "description": "Lorsque qu'une chaîne (ou plusieurs) ne fonctionne pas et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "FFTY",
+    "description": "Lorsque la connexion Internet du bateau ne fonctionne plus et que le conseiller indique qu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "EVENT",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "Hébergement",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service hébergement"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "FTTH Reseau Prive",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur accès internet réseau privé"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "VPS",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service hébergement VPS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "IaaS",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service hébergement IaaS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "Data Center",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service hébergement en data center"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "Connectivity INTERNET",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service Connectivity Internet"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "Connectivity LAN",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service Connectivity LAN (réseau privé)"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "AntiDDOS",
+    "categorie_operationnelle_3": "AntiDDOS",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service AntiDDOS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Pack Sécurité",
+    "categorie_operationnelle_3": "Pack Sécurité",
+    "description": "Lorsqu'un incident est en cours ou que plusieurs clients rencontrent la même anomalie sur leur service Pack sécurité"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Legacy Internet",
+    "categorie_operationnelle_3": "Xdsl",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Incident de masse",
+    "categorie_operationnelle_2": "Legacy Fixe",
+    "categorie_operationnelle_3": "Analogique /T0/ T2",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Pro actif Supervision",
+    "categorie_operationnelle_2": "Pro actif Connectivity",
+    "categorie_operationnelle_3": "",
+    "description": "Lorsque Monaco Telecom appelle un client pour l'informer d'une coupure sur son lien Connectivity"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Pro actif Supervision",
+    "categorie_operationnelle_2": "Pro actif Hébergement",
+    "categorie_operationnelle_3": "",
+    "description": "Lorsque Monaco Telecom appelle un client pour l'informer d'une anomalie sur son hébergement"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Pro actif Supervision",
+    "categorie_operationnelle_2": "Pro actif Fraude Téléphonie",
+    "categorie_operationnelle_3": "",
+    "description": "Lorsque Monaco Telecom appelle un client pour l'informer d'une fraude sur sa ligne téléphonique"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec accroche réseau FR",
+    "description": "Lorsque le client n'arrive pas à se connecter au réseau mobile depuis la France"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec accroche réseau MC",
+    "description": "Lorsque le client n'arrive pas à se connecter au réseau mobile depuis Monaco"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec accroche réseau Roaming (Hors MC & FR)",
+    "description": "\"Lorsque le client n'arrive pas à se connecter au réseau mobile depuis  l'étranger"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec connexion data FR",
+    "description": "Lorsque le client n'arrive pas à utiliser l'internet Mobile en France"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec connexion data MC",
+    "description": "Lorsque le client n'arrive pas à utiliser l'internet Mobile à Monaco"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec connexion data Roaming (Hors MC & FR)",
+    "description": "Lorsque le client n'arrive pas à utiliser l'internet Mobile à l'étranger (hors Monaco et France)"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission / réception SMS/MMS",
+    "description": "Lorsque le client n'arrive pas à envoyer ou recevoir des sms/MMS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission réception appel FR",
+    "description": "Lorsque le client n'arrive pas à passer ou recevoir des appels en France"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission réception appel MC",
+    "description": "Lorsque le client n'arrive pas à passer ou recevoir des appels à Monaco"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Echec émission réception appel Roaming (Hors MC & FR)",
+    "description": "\"Lorsque le client n'arrive pas à passer ou recevoir des appels à l'étranger"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Lenteurs data mobile",
+    "description": "Lorsque le client se plaint de lenteurs ou de débits réduits lors de l'utilisation de la connexion data mobile"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "PB Qualité appel mobile dégradée MC",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité des appels"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "\"Problème messagerie vocale mobile (888",
+    "description": "VVM)\""
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "ACCES CHAINES MTTV /-  pb sur un pack de chaînes",
+    "description": "Lorsque le client n'arrive pas à accéder aux chaînes d'un pack sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "ACCES CHAINES MTTV /- pb sur plusieurs chaînes",
+    "description": "Lorsque le client n'arrive pas à accéder à différentes chaînes sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "ACCES CHAINES MTTV /- pb sur une chaîne",
+    "description": "Lorsque le client n'arrive pas à accéder à une chaîne spécifique sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "APPLE TV / Perte de la connexion Wifi",
+    "description": "Lorsque l'Apple TV n'est plus connectée à la TV en wifi sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "LANCEMENT APPLI MTTV/- Impossible",
+    "description": "Lorsque le client ne parvient plus à lancer l'appli MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "LANCEMENT APPLI MTTV/- ZSO KO",
+    "description": "Lorsque le client ne parvient pas à accéder à l'appli MTTV à cause d'un problème d'authentification ZSO"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "PB Enregistrement/Replay MTTV",
+    "description": "Lorsque le client ne parvient plus à enregistrer ou regarder un replay depuis  l'appli MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "PB SON ET IMAGE MTTV /- Image et/ou son dégradés",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité du son et de l'image sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "PB SON ET IMAGE MTTV /- Pas d'image et/ou son",
+    "description": "Lorsque le client se plaint de ne plus avoir d'image ou de son sur MTTV"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "Sous-titrage / audio description / VO",
+    "description": "\"Lorsque les sous titres"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MTTV",
+    "categorie_operationnelle_3": "TELECOMMANDE APPLE TV /- pb d'appairage",
+    "description": "\"Lorsque la télécommande de l'Apple TV n'est plus connectée à la TV du client"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "ACCES CHAINES TV (Docsis/SU) /-  pb sur un pack de chaînes",
+    "description": "Lorsque le client n'arrive pas à accéder aux chaînes d'un pack sur TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "ACCES CHAINES TV (Docsis/SU) /- pb sur plusieurs chaînes",
+    "description": "Lorsque le client n'arrive pas à accéder à différentes chaînes sur TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "ACCES CHAINES TV (Docsis/SU) /- pb sur une chaîne",
+    "description": "Lorsque le client n'arrive pas à accéder à une chaîne spécifique sur TV Docsis"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Enregistrement TV (Docsis/SU) dégradé",
+    "description": "Lorsque l'enregistrement d'un programme est dégradé sur TV Docsis ou le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Enregistrement TV (Docsis/SU) impossible / Pb permanent",
+    "description": "Lorsque l'enregistrement de tous les programmes est impossible sur TV Docsis ou le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Enregistrement TV (Docsis/SU) impossible / Pb unitaire",
+    "description": "Lorsque l'enregistrement d'un programme est impossible sur TV Docsis ou le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Guide des programmes défectueux TV (Docsis/SU)",
+    "description": "Lorsque l'accès au guide des programmes sur TV Docsis ou service universel est défectueux"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Pb de contrôle du direct TV (Docsis/SU)",
+    "description": "Lorsqu'il est impossible de retrouver la lecture de son programme en direct sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "PB SON ET IMAGE TV (Docsis/SU) /-  Image et son dégradés",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité du son et de l'image sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "PB SON ET IMAGE TV (Docsis/SU) /- Image dégradée",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité de l'image sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "PB SON ET IMAGE TV (Docsis/SU) /- Pas d'image",
+    "description": "Lorsque le client se plaint de ne plus avoir d'image sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "PB SON ET IMAGE TV (Docsis/SU) /- Pas de son",
+    "description": "Lorsque le client se plaint de ne plus avoir de son sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "PB SON ET IMAGE TV (Docsis/SU) /- Pas de son et image",
+    "description": "Lorsque le client se plaint de ne plus avoir d'image ou de son sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "PB SON ET IMAGE TV (Docsis/SU) /- Son dégradé",
+    "description": "Lorsque le client se plaint d'une mauvaise qualité de son sur TV Docsis ou sur le Service Universel"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "Sous-titrage / audio description / VO",
+    "description": "\"Lorsque les sous titres"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "TELECOMMANDE / Pb apparairage  TV (Docsis/SU)",
+    "description": "\"Lorsque la télécommande n'est plus connectée à la TV du client"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "TELECOMMANDE / Pb de fonctionnement TV (Docsis/SU)",
+    "description": "\"Lorsque la télécommande ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "TV Docsis",
+    "categorie_operationnelle_3": "VOD service défectueux",
+    "description": "\"Lorsque le service de vidéo à la demande ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "ACCES INTERNET / indisponible (Box fibre)",
+    "description": "Lorsque la connexion Internet de la box Fibre ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "ACCES INTERNET / intermittent (Box fibre)",
+    "description": "Lorsque la connexion Internet de la box Fibre fonctionne par intermitence"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "ETHERNET / Connexion impossible (Box Fibre)",
+    "description": "Lorsque la connexion Internet par câble ethernet de la box Fibre ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "ETHERNET / Connexion lente/dégradée (Box Fibre)",
+    "description": "Lorsque la connexion Internet par câble ethernet de la box Fibre est lente ou dégradée"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "VOIP / Emission/Qualité Appel dégradée (Box Fibre)",
+    "description": "Lorsque les appels depuis le téléphone fixe de la box fibre sont de mauvaise qualité"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "VOIP / Emission/Réception impossible (Box Fibre)",
+    "description": "Lorsque les appels depuis et vers le téléphone fixe de la box fibre sont impossible"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "VOIP / Pb Messagerie Vocale (Box Fibre)",
+    "description": "Lorsque la messagerie vocale du téléphone fixe de la box fibre dysfonctionne"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "WIFI / Connexion impossible (Box Fibre)",
+    "description": "Lorsque le wifi de la box fibre ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "WIFI / Connexion lente/dégradée (Box Fibre)",
+    "description": "Lorsque le wifi de la box fibre ne permet qu'une connexion lente ou dégradée"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "WIFI / Pb Mesh (Box Fibre)",
+    "description": "Lorsque le boitier wifi mesh relié à la box fibre dysfonctionne"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "ACCES INTERNET / indisponible (Box Docsis)",
+    "description": "Lorsque la connexion Internet de la box Docsis ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "ACCES INTERNET / intermittent (Box Docsis)",
+    "description": "Lorsque la connexion Internet de la box Docsis fonctionne par intermitence"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "ACCES INTERNET / lent/dégradé (Box Docsis)",
+    "description": "Lorsque la connexion Internet de la box Docsis est lente ou dégradée"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "ETHERNET / Connexion impossible (Box Docsis)",
+    "description": "Lorsque la connexion Internet par câble ethernet de la box Docsis ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "ETHERNET / Connexion lente/dégradée (Box Docsis)",
+    "description": "Lorsque la connexion Internet par câble ethernet de la box Docsis est lente ou dégradée"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "VOIP / Emission/Qualité Appel dégradée (Box Docsis)",
+    "description": "Lorsque les appels depuis le téléphone fixe de la box Docsis sont de mauvaise qualité"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "VOIP / Emission/Réception impossible (Box Docsis)",
+    "description": "Lorsque les appels depuis et vers le téléphone fixe de la box Docsis sont impossible"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "VOIP /Pb Messagerie Vocale (Box Docsis)",
+    "description": "Lorsque la messagerie vocale du téléphone fixe de la box Docsis dysfonctionne"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "WIFI / Connexion impossible (Box Docsis)",
+    "description": "Lorsque le wifi de la box Docsis ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "WIFI / Connexion lente/dégradée (Box Docsis)",
+    "description": "Lorsque le wifi de la box Docsis ne permet qu'une connexion lente ou dégradée"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "WIFI / Pb de couverture (Box Docsis)",
+    "description": "Lorsque le wifi de la box Docsis ne couvre pas tout le logement"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "Pb de spam",
+    "description": "Lorsque les mails arrivent directement en spam à tort"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "Accès webmail KO",
+    "description": "Lorsque le client ne peut plus accèder à son webmail"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Mails",
+    "categorie_operationnelle_3": "Emission/réception mails KO",
+    "description": "Lorsque le client accède à sa boîte mail sans pouvoir envoyer et recevoir de mails"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MyMT",
+    "categorie_operationnelle_3": "Accès MyMT impossible",
+    "description": "Lorsque le client ne peut plus accèder à son espace client en ligne MyMT"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MyMT",
+    "categorie_operationnelle_3": "Fonctionnalité(s) MyMT KO",
+    "description": "Lorsque plusieurs fonctionnalités de l'espace client en ligne MyMT sont inaccessibles"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MyMT",
+    "categorie_operationnelle_3": "Lenteurs MyMT (accès ou navigation)",
+    "description": "Lorsque le client met beaucoup de temps à accèder à son espace client en ligne MyMT ou que la navigation sur les différentes pages est très lente"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Emission/Réception appels impossible",
+    "description": "Lorsque le client n'arrive pas à passer ou recevoir des appels depuis son service Trunksip"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Ko suite Migration",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Non présentation des numéros",
+    "description": "Lorsque le trunksip n'affiche pas les numéros"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Problème audio",
+    "description": "En cas de communication dégradée ou absence de son du trunksip"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Trunksip",
+    "categorie_operationnelle_3": "Problème d'enregistrement technique",
+    "description": "Lorsque le trunksip ne s'enregistre pas"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Nom de domaine",
+    "categorie_operationnelle_3": "Service DNS KO",
+    "description": "Lorsque le service DNS ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "Accès au portail KO",
+    "description": "Lorsque le client ne parvient pas à accéder au portail MCR"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "Pas d'appels enregistré",
+    "description": "Lorsque le client indique qu'il manque tout ou partie des enregistrements d'appels par son service Monaco Care recording"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "Pas de SMS enregistré",
+    "description": "Lorsque le client indique qu'il manque tout ou partie des SMS enregistré par son service Monaco Care recording"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "MCR",
+    "categorie_operationnelle_3": "Problème de clé de sécurité",
+    "description": "Lorsque le client indique un souci de clé de sécurité relatif à son service Monaco Care recording"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "EVENT",
+    "description": "Lorsqu'un client rencontre une anomalie lors de son event"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "FTTY",
+    "description": "Lorsque la connexion Internet du bateau ne fonctionne plus"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "FTTH Reseau Prive",
+    "description": "Lorsqu'un client rencontre une anomalie sur son accès internet réseau privé"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "Hébergement",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service hébergement"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "IPTV",
+    "description": "Lorsque qu'une chaîne (ou plusieurs) ne fonctionne pas"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "OSM",
+    "categorie_operationnelle_3": "WIFI",
+    "description": "Lorsque l'accès au portail wifi est KO ou que le wifi ne fonctionne pas"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "VPS",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service hébergement VPS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "IaaS",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service hébergement IaaS"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Hébergement",
+    "categorie_operationnelle_3": "Data Center",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service hébergement en data center"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Legacy Fixe",
+    "categorie_operationnelle_3": "Analogique / T0 / T2",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "LAN",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service Connectivity LAN"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Connectivity",
+    "categorie_operationnelle_3": "Internet",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service Connectivity Internet"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "AntiDDOS",
+    "categorie_operationnelle_3": "AntiDDOS",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service antiDDos"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Pack Sécurité",
+    "categorie_operationnelle_3": "Pack Sécurité",
+    "description": "Lorsqu'un client rencontre une anomalie sur son service pack sécurité"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Problème technique individuel",
+    "categorie_operationnelle_2": "Legacy Internet",
+    "categorie_operationnelle_3": "Xdsl",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Fsecure",
+    "categorie_operationnelle_3": "Création initiale",
+    "description": "Lorsqu'un client ne parvient pas à créer son compte Monaco Care Safety"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Fsecure",
+    "categorie_operationnelle_3": "Assistance après mise en service",
+    "description": "Lorsqu'un client ne parvient pas à utiliser son compte Monaco Care Safety  dans les 15 jours suivant sa création"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Création initiale",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Internet Docsis",
+    "categorie_operationnelle_3": "Assistance après mise en service",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Création initiale",
+    "description": "En cas de migration de l'offre Docsis vers l'offre Fibre"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Internet Fibre",
+    "categorie_operationnelle_3": "Assistance après mise en service",
+    "description": "En cas de besoin d'assistance sur la box fibre dans les 15 jours qui suivent l'activation du service"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "NDD",
+    "categorie_operationnelle_3": "Création initiale",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "NDD",
+    "categorie_operationnelle_3": "Assistance après mise en service",
+    "description": "En cas de besoin d'assistance sur le Nom de domaine dans les 15 jours qui suivent l'activation du service"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "SSL",
+    "categorie_operationnelle_3": "Création initiale",
+    "description": "En cas de création d'un certificat SSL"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "SSL",
+    "categorie_operationnelle_3": "Assistance après mise en service",
+    "description": "En cas de besoin d'assistance sur le certificat SSL dans les 15 jours qui suivent l'activation du service"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Trunksip/Teams",
+    "categorie_operationnelle_3": "Création initiale",
+    "description": "En cas de création d'une offre Trunksip/Teams ou d'une migration Sonus vers Ribbon"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "Provisionning",
+    "categorie_operationnelle_2": "Trunksip/Teams",
+    "categorie_operationnelle_3": "Assistance après mise en service",
+    "description": "En cas de besoin d'assistance sur le trunksip/teams dans les 15 jours qui suivent l'activation du service"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Apple TV",
+    "categorie_operationnelle_3": "Aide à l'usage",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Apple TV",
+    "categorie_operationnelle_3": "Echange Apple TV",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Apple TV",
+    "categorie_operationnelle_3": "Echange divers",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Apple TV",
+    "categorie_operationnelle_3": "Echange Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Apple TV",
+    "categorie_operationnelle_3": "Test Apple TV",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Apple TV",
+    "categorie_operationnelle_3": "Test Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Cuivre",
+    "categorie_operationnelle_3": "Echange Box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Cuivre",
+    "categorie_operationnelle_3": "Test box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Denver",
+    "categorie_operationnelle_3": "Echange Box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Denver",
+    "categorie_operationnelle_3": "Echange Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Denver",
+    "categorie_operationnelle_3": "Test box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Denver",
+    "categorie_operationnelle_3": "Test Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "DOCSIS",
+    "categorie_operationnelle_3": "Echange Box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "DOCSIS",
+    "categorie_operationnelle_3": "Echange divers",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "DOCSIS",
+    "categorie_operationnelle_3": "Echange Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "DOCSIS",
+    "categorie_operationnelle_3": "Test box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "DOCSIS",
+    "categorie_operationnelle_3": "Test Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Fibre",
+    "categorie_operationnelle_3": "Echange Box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Fibre",
+    "categorie_operationnelle_3": "Echange divers",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Fibre",
+    "categorie_operationnelle_3": "Echange Mesh",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Fibre",
+    "categorie_operationnelle_3": "Echange Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Fibre",
+    "categorie_operationnelle_3": "Test box",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Fibre",
+    "categorie_operationnelle_3": "Test Telecommande",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Aise à l'usage",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Changement SIM",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Monaco Care Mobile",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Prêt de mobile",
+    "description": "N/A"
+  },
+  {
+    "type_typologie": "Typologie Tech",
+    "type_incident": "Restauration du service utilisateur",
+    "categorie_operationnelle_1": "SAV Boutique",
+    "categorie_operationnelle_2": "Mobile",
+    "categorie_operationnelle_3": "Transfert de données Mobile",
+    "description": "N/A"
+  }
+]
+"""
+
+# ---- Functions ----
+
+def transcribe_audio(file_path):
+    model = whisper.load_model("base")  # or "small", "medium", "large"
+    result = model.transcribe(file_path)
+    return result["text"]
+
+def query_ollama(prompt: str, transcript: str):
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": f"{prompt.strip()}\n\n{transcript.strip()}",
+        "stream": False
+    }
+    response = requests.post(OLLAMA_URL, json=payload)
+    response.raise_for_status()
+    return response.json()["response"]
+
+def save_json(obj, path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+
+# ---- Main ----
+
+def main(audio_file):
+    print(f"[+] Transcribing {audio_file} ...")
+    transcript = transcribe_audio(audio_file)
+    Path("output").mkdir(exist_ok=True)
+    with open("output/transcript.txt", "w") as f:
+        f.write(transcript)
+
+    print("[+] Querying for qualification JSON ...")
+    result1 = query_ollama(PROMPT_QUALIFICATION, transcript)
+    save_json(json.loads(result1), "output/summary.json")
+
+    print("[+] Querying for critical issues ...")
+    result2 = query_ollama(PROMPT_CRITICAL_ISSUES, transcript)
+    save_json(json.loads(result2), "output/issues.json")
+
+    print("[+] Querying for categorization ...")
+    result3 = query_ollama(PROMPT_TYPING, transcript)
+    save_json(json.loads(result3), "output/typology.json")
+
+    print("[✓] All outputs saved in /output/")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python process_audio.py path/to/audio.wav")
+        sys.exit(1)
+    main(sys.argv[1])

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDE - Audio Transcript Analysis</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2d2d30;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            color: #cccccc;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .nav-btn {
+            background: #0e639c;
+            border: none;
+            border-radius: 4px;
+            padding: 0.4rem 0.8rem;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .nav-btn:hover {
+            background: #1177bb;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 250px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-explorer {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .file-tree {
+            list-style: none;
+        }
+
+        .file-item {
+            padding: 0.3rem;
+            cursor: pointer;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            margin-left: 0px;
+        }
+
+        .file-item:hover {
+            background: #2a2d2e;
+        }
+
+        .file-item.selected {
+            background: #094771;
+        }
+
+        .file-item i {
+            width: 14px;
+            font-size: 0.8rem;
+        }
+
+        .file-item.nested {
+            margin-left: 20px;
+        }
+
+        .folder-expanded .fa-folder:before {
+            content: "\f07c";
+        }
+
+        .folder-collapsed .fa-folder:before {
+            content: "\f07b";
+        }
+
+        .expand-icon {
+            width: 12px !important;
+            font-size: 0.7rem !important;
+            margin-right: 0.2rem;
+            cursor: pointer;
+        }
+
+        .file-tree-item {
+            list-style: none;
+        }
+
+        .folder-contents {
+            display: none;
+        }
+
+        .folder-contents.expanded {
+            display: block;
+        }
+
+        .directory {
+            color: #cccccc;
+        }
+
+        .file {
+            color: #d4d4d4;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tabs {
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            min-height: 35px;
+        }
+
+        .tab {
+            background: #2d2d30;
+            border: none;
+            padding: 0.5rem 1rem;
+            color: #cccccc;
+            cursor: pointer;
+            border-right: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .tab.active {
+            background: #1e1e1e;
+            color: #ffffff;
+        }
+
+        .tab .close {
+            margin-left: 0.5rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 2px;
+        }
+
+        .tab .close:hover {
+            background: #464647;
+        }
+
+        .editor-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #editor {
+            width: 100%;
+            height: 100%;
+        }
+
+        .toolbar {
+            background: #2d2d30;
+            padding: 0.5rem;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            background: #0e639c;
+            border: none;
+            border-radius: 3px;
+            padding: 0.3rem 0.6rem;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .btn:hover {
+            background: #1177bb;
+        }
+
+        .status-bar {
+            background: #007acc;
+            color: white;
+            padding: 0.3rem 1rem;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-code"></i> IDE</h1>
+        <div class="nav-buttons">
+            <a href="/" class="nav-btn"><i class="fas fa-home"></i> Home</a>
+            <a href="/terminal" class="nav-btn"><i class="fas fa-terminal"></i> Terminal</a>
+            <a href="/browser" class="nav-btn"><i class="fas fa-globe"></i> Browser</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="toolbar">
+                <button class="btn" onclick="refreshFiles()">
+                    <i class="fas fa-refresh"></i> Refresh
+                </button>
+                <button class="btn" onclick="newFile()">
+                    <i class="fas fa-plus"></i> New
+                </button>
+            </div>
+            <div class="file-explorer">
+                <ul class="file-tree" id="fileTree">
+                    <!-- Files will be loaded here -->
+                </ul>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="tabs" id="tabs">
+                <!-- Tabs will be added here -->
+            </div>
+            <div class="editor-container">
+                <div id="editor"></div>
+            </div>
+            <div class="status-bar">
+                <span id="status">Ready</span>
+                <span id="cursor-position">Line 1, Column 1</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script>
+        let editor;
+        let openTabs = new Map();
+        let activeTab = null;
+        let expandedFolders = new Set();
+
+        // Initialize Monaco Editor
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '// Welcome to the IDE\n// Select a file to start editing',
+                language: 'javascript',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                fontSize: 14,
+                wordWrap: 'on'
+            });
+
+            // Update cursor position
+            editor.onDidChangeCursorPosition((e) => {
+                document.getElementById('cursor-position').textContent = 
+                    `Line ${e.position.lineNumber}, Column ${e.position.column}`;
+            });
+
+            // Auto-save on content change
+            let saveTimeout;
+            editor.onDidChangeModelContent(() => {
+                if (activeTab) {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(() => {
+                        saveFile(activeTab);
+                    }, 1000); // Auto-save after 1 second of inactivity
+                }
+            });
+        });
+
+        // Load file tree
+        async function loadFiles(path = '.', container = null, nestLevel = 0) {
+            try {
+                const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                const targetContainer = container || document.getElementById('fileTree');
+                if (!container) {
+                    targetContainer.innerHTML = '';
+                }
+                
+                data.items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'file-tree-item';
+                    
+                    if (item.type === 'directory') {
+                        const isExpanded = expandedFolders.has(item.path);
+                        li.innerHTML = `
+                            <div class="file-item ${isExpanded ? 'folder-expanded' : 'folder-collapsed'}" style="margin-left: ${nestLevel * 20}px">
+                                <i class="fas fa-chevron-right expand-icon ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+                                <i class="fas fa-folder"></i>
+                                <span>${item.name}</span>
+                            </div>
+                            <ul class="folder-contents ${isExpanded ? 'expanded' : ''}"></ul>
+                        `;
+                        
+                        const fileItem = li.querySelector('.file-item');
+                        const expandIcon = li.querySelector('.expand-icon');
+                        const folderContents = li.querySelector('.folder-contents');
+                        
+                        const toggleFolder = async (e) => {
+                            e.stopPropagation();
+                            
+                            if (expandedFolders.has(item.path)) {
+                                // Collapse folder
+                                expandedFolders.delete(item.path);
+                                folderContents.classList.remove('expanded');
+                                expandIcon.className = 'fas fa-chevron-right expand-icon';
+                                fileItem.classList.remove('folder-expanded');
+                                fileItem.classList.add('folder-collapsed');
+                                folderContents.innerHTML = '';
+                            } else {
+                                // Expand folder
+                                expandedFolders.add(item.path);
+                                folderContents.classList.add('expanded');
+                                expandIcon.className = 'fas fa-chevron-down expand-icon';
+                                fileItem.classList.remove('folder-collapsed');
+                                fileItem.classList.add('folder-expanded');
+                                
+                                // Load folder contents
+                                await loadFiles(item.path, folderContents, nestLevel + 1);
+                            }
+                        };
+                        
+                        expandIcon.onclick = toggleFolder;
+                        fileItem.onclick = toggleFolder;
+                        
+                    } else {
+                        li.innerHTML = `
+                            <div class="file-item" style="margin-left: ${(nestLevel * 20) + 14}px">
+                                <i class="fas ${getFileIcon(item.name)}"></i>
+                                <span>${item.name}</span>
+                            </div>
+                        `;
+                        
+                        const fileItem = li.querySelector('.file-item');
+                        fileItem.onclick = () => {
+                            // Remove selected class from all items
+                            document.querySelectorAll('.file-item').forEach(item => {
+                                item.classList.remove('selected');
+                            });
+                            // Add selected class to clicked item
+                            fileItem.classList.add('selected');
+                            openFile(item.path);
+                        };
+                    }
+                    
+                    targetContainer.appendChild(li);
+                });
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'js': 'fa-file-code',
+                'py': 'fa-file-code',
+                'html': 'fa-file-code',
+                'css': 'fa-file-code',
+                'json': 'fa-file-code',
+                'md': 'fa-file-text',
+                'txt': 'fa-file-text',
+                'yml': 'fa-file-code',
+                'yaml': 'fa-file-code'
+            };
+            return icons[ext] || 'fa-file';
+        }
+
+        async function openFile(path) {
+            try {
+                if (openTabs.has(path)) {
+                    switchTab(path);
+                    return;
+                }
+
+                const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                openTabs.set(path, {
+                    content: data.content,
+                    language: getLanguageFromPath(path),
+                    modified: false
+                });
+                
+                createTab(path);
+                switchTab(path);
+            } catch (error) {
+                console.error('Error opening file:', error);
+                document.getElementById('status').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function getLanguageFromPath(path) {
+            const ext = path.split('.').pop().toLowerCase();
+            const languages = {
+                'js': 'javascript',
+                'py': 'python',
+                'html': 'html',
+                'css': 'css',
+                'json': 'json',
+                'md': 'markdown',
+                'txt': 'plaintext',
+                'yml': 'yaml',
+                'yaml': 'yaml'
+            };
+            return languages[ext] || 'plaintext';
+        }
+
+        function createTab(path) {
+            const tabsContainer = document.getElementById('tabs');
+            const tab = document.createElement('div');
+            tab.className = 'tab';
+            tab.setAttribute('data-path', path);
+            
+            const filename = path.split('/').pop();
+            tab.innerHTML = `
+                <i class="fas ${getFileIcon(filename)}"></i>
+                <span>${filename}</span>
+                <span class="close" onclick="closeTab('${path}')">&times;</span>
+            `;
+            
+            tab.onclick = (e) => {
+                if (!e.target.classList.contains('close')) {
+                    switchTab(path);
+                }
+            };
+            
+            tabsContainer.appendChild(tab);
+        }
+
+        function switchTab(path) {
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Add active class to selected tab
+            const tab = document.querySelector(`[data-path="${path}"]`);
+            if (tab) {
+                tab.classList.add('active');
+            }
+            
+            // Update editor content
+            const tabData = openTabs.get(path);
+            if (tabData && editor) {
+                const model = monaco.editor.createModel(tabData.content, tabData.language);
+                editor.setModel(model);
+                activeTab = path;
+                document.getElementById('status').textContent = `Editing: ${path}`;
+            }
+        }
+
+        function closeTab(path) {
+            openTabs.delete(path);
+            const tab = document.querySelector(`[data-path="${path}"]`);
+            if (tab) {
+                tab.remove();
+            }
+            
+            if (activeTab === path) {
+                activeTab = null;
+                if (openTabs.size > 0) {
+                    const nextTab = openTabs.keys().next().value;
+                    switchTab(nextTab);
+                } else {
+                    editor.setModel(monaco.editor.createModel('// No files open', 'javascript'));
+                    document.getElementById('status').textContent = 'Ready';
+                }
+            }
+        }
+
+        async function saveFile(path) {
+            try {
+                const content = editor.getValue();
+                const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('status').textContent = `Saved: ${path}`;
+                    const tabData = openTabs.get(path);
+                    if (tabData) {
+                        tabData.modified = false;
+                    }
+                } else {
+                    throw new Error('Failed to save file');
+                }
+            } catch (error) {
+                console.error('Error saving file:', error);
+                document.getElementById('status').textContent = `Error saving: ${error.message}`;
+            }
+        }
+
+        function newFile() {
+            const filename = prompt('Enter filename:');
+            if (filename) {
+                const path = filename;
+                openTabs.set(path, {
+                    content: '',
+                    language: getLanguageFromPath(path),
+                    modified: true
+                });
+                createTab(path);
+                switchTab(path);
+            }
+        }
+
+        function refreshFiles() {
+            loadFiles();
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 's':
+                        e.preventDefault();
+                        if (activeTab) {
+                            saveFile(activeTab);
+                        }
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        newFile();
+                        break;
+                }
+            }
+        });
+
+        // Load files on startup
+        loadFiles();
+    </script>
+</body>
+</html> 

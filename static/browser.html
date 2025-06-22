@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser - Audio Transcript Analysis</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #ffffff;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #e1e4e8;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            color: #24292e;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .nav-btn {
+            background: #0366d6;
+            border: none;
+            border-radius: 4px;
+            padding: 0.4rem 0.8rem;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .nav-btn:hover {
+            background: #0256cc;
+        }
+
+        .browser-header {
+            background: #f6f8fa;
+            border-bottom: 1px solid #e1e4e8;
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .browser-controls {
+            display: flex;
+            gap: 0.3rem;
+        }
+
+        .control-btn {
+            background: #ffffff;
+            border: 1px solid #d1d5da;
+            border-radius: 4px;
+            padding: 0.4rem 0.6rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #586069;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: #f3f4f6;
+            border-color: #c1c5ca;
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .address-bar {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0 1rem;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 0.5rem 0.8rem;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: #ffffff;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: #0366d6;
+            box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+        }
+
+        .go-btn {
+            background: #28a745;
+            border: none;
+            border-radius: 4px;
+            padding: 0.5rem 1rem;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .go-btn:hover {
+            background: #218838;
+        }
+
+        .bookmarks {
+            display: flex;
+            gap: 0.3rem;
+        }
+
+        .bookmark {
+            background: #ffffff;
+            border: 1px solid #d1d5da;
+            border-radius: 4px;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-decoration: none;
+            color: #586069;
+        }
+
+        .bookmark:hover {
+            background: #f3f4f6;
+        }
+
+        .browser-content {
+            height: calc(100vh - 120px);
+            position: relative;
+        }
+
+        .iframe-container {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #ffffff;
+        }
+
+        .loading-indicator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #0366d6;
+            transform-origin: left;
+            animation: loading 2s ease-in-out infinite;
+            display: none;
+        }
+
+        @keyframes loading {
+            0% { transform: scaleX(0); }
+            50% { transform: scaleX(0.7); }
+            100% { transform: scaleX(1); opacity: 0; }
+        }
+
+        .status-bar {
+            background: #f6f8fa;
+            border-top: 1px solid #e1e4e8;
+            padding: 0.3rem 1rem;
+            font-size: 0.8rem;
+            color: #586069;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .error-page {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: #586069;
+        }
+
+        .error-page i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            color: #d73a49;
+        }
+
+        .quick-links {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .quick-link {
+            background: #ffffff;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+            padding: 0.8rem 1rem;
+            text-decoration: none;
+            color: #24292e;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 120px;
+        }
+
+        .quick-link:hover {
+            background: #f3f4f6;
+            border-color: #0366d6;
+        }
+
+        .quick-link i {
+            font-size: 1.5rem;
+            color: #0366d6;
+        }
+
+        .home-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .home-page h2 {
+            margin-bottom: 2rem;
+            color: #24292e;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-globe"></i> Browser</h1>
+        <div class="nav-buttons">
+            <a href="/" class="nav-btn"><i class="fas fa-home"></i> Home</a>
+            <a href="/ide" class="nav-btn"><i class="fas fa-code"></i> IDE</a>
+            <a href="/terminal" class="nav-btn"><i class="fas fa-terminal"></i> Terminal</a>
+        </div>
+    </div>
+
+    <div class="browser-header">
+        <div class="browser-controls">
+            <button class="control-btn" id="backBtn" onclick="goBack()">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <button class="control-btn" id="forwardBtn" onclick="goForward()">
+                <i class="fas fa-arrow-right"></i>
+            </button>
+            <button class="control-btn" onclick="refreshPage()">
+                <i class="fas fa-refresh"></i>
+            </button>
+            <button class="control-btn" onclick="goHome()">
+                <i class="fas fa-home"></i>
+            </button>
+        </div>
+        
+        <div class="address-bar">
+            <input type="text" class="url-input" id="urlInput" placeholder="Enter URL or search term..." value="">
+            <button class="go-btn" onclick="navigate()">Go</button>
+        </div>
+
+        <div class="bookmarks">
+            <a href="#" class="bookmark" onclick="quickNavigate('https://www.google.com')">Google</a>
+            <a href="#" class="bookmark" onclick="quickNavigate('https://github.com')">GitHub</a>
+            <a href="#" class="bookmark" onclick="quickNavigate('https://stackoverflow.com')">Stack Overflow</a>
+            <a href="#" class="bookmark" onclick="quickNavigate('localhost:8000')">Local App</a>
+        </div>
+    </div>
+
+    <div class="browser-content">
+        <div class="loading-indicator" id="loadingIndicator"></div>
+        
+        <div class="home-page" id="homePage">
+            <h2>Welcome to the Integrated Browser</h2>
+            <div class="quick-links">
+                <a href="#" class="quick-link" onclick="quickNavigate('https://www.google.com')">
+                    <i class="fab fa-google"></i>
+                    <span>Google</span>
+                </a>
+                <a href="#" class="quick-link" onclick="quickNavigate('https://github.com')">
+                    <i class="fab fa-github"></i>
+                    <span>GitHub</span>
+                </a>
+                <a href="#" class="quick-link" onclick="quickNavigate('https://stackoverflow.com')">
+                    <i class="fab fa-stack-overflow"></i>
+                    <span>Stack Overflow</span>
+                </a>
+                <a href="#" class="quick-link" onclick="quickNavigate('localhost:8000')">
+                    <i class="fas fa-server"></i>
+                    <span>Local App</span>
+                </a>
+                <a href="#" class="quick-link" onclick="quickNavigate('https://developer.mozilla.org')">
+                    <i class="fab fa-firefox"></i>
+                    <span>MDN Web Docs</span>
+                </a>
+                <a href="#" class="quick-link" onclick="quickNavigate('https://www.wikipedia.org')">
+                    <i class="fab fa-wikipedia-w"></i>
+                    <span>Wikipedia</span>
+                </a>
+            </div>
+        </div>
+
+        <iframe id="browserFrame" class="iframe-container" style="display: none;"></iframe>
+
+        <div class="error-page" id="errorPage">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Unable to load page</h3>
+            <p>The requested page could not be loaded. Please check the URL and try again.</p>
+            <button class="control-btn" onclick="goHome()" style="margin-top: 1rem;">
+                <i class="fas fa-home"></i> Go Home
+            </button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="statusText">Ready</span>
+        <span id="urlDisplay"></span>
+    </div>
+
+    <script>
+        let currentUrl = '';
+        let history = [];
+        let historyIndex = -1;
+
+        const urlInput = document.getElementById('urlInput');
+        const browserFrame = document.getElementById('browserFrame');
+        const homePage = document.getElementById('homePage');
+        const errorPage = document.getElementById('errorPage');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const statusText = document.getElementById('statusText');
+        const urlDisplay = document.getElementById('urlDisplay');
+        const backBtn = document.getElementById('backBtn');
+        const forwardBtn = document.getElementById('forwardBtn');
+
+        function showLoading() {
+            loadingIndicator.style.display = 'block';
+            statusText.textContent = 'Loading...';
+        }
+
+        function hideLoading() {
+            loadingIndicator.style.display = 'none';
+            statusText.textContent = 'Ready';
+        }
+
+        function updateNavigationButtons() {
+            backBtn.disabled = historyIndex <= 0;
+            forwardBtn.disabled = historyIndex >= history.length - 1;
+        }
+
+        function addToHistory(url) {
+            // Remove any forward history if we're navigating to a new page
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+            
+            history.push(url);
+            historyIndex = history.length - 1;
+            updateNavigationButtons();
+        }
+
+        function showPage(pageType) {
+            homePage.style.display = pageType === 'home' ? 'flex' : 'none';
+            browserFrame.style.display = pageType === 'iframe' ? 'block' : 'none';
+            errorPage.style.display = pageType === 'error' ? 'flex' : 'none';
+        }
+
+        function navigate(url = null) {
+            const targetUrl = url || urlInput.value.trim();
+            
+            if (!targetUrl) {
+                goHome();
+                return;
+            }
+
+            let finalUrl = targetUrl;
+
+            // Handle special cases
+            if (targetUrl === 'home' || targetUrl === '') {
+                goHome();
+                return;
+            }
+
+            // Add protocol if missing
+            if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+                if (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
+                    finalUrl = `http://${targetUrl}`;
+                } else if (targetUrl.includes('.') || targetUrl.startsWith('www.')) {
+                    finalUrl = `https://${targetUrl}`;
+                } else {
+                    // Treat as search query
+                    finalUrl = `https://www.google.com/search?q=${encodeURIComponent(targetUrl)}`;
+                }
+            }
+
+            showLoading();
+            showPage('iframe');
+            
+            currentUrl = finalUrl;
+            urlInput.value = finalUrl;
+            urlDisplay.textContent = finalUrl;
+            
+            // Add to history if it's a new navigation
+            if (url !== null || history[historyIndex] !== finalUrl) {
+                addToHistory(finalUrl);
+            }
+
+            browserFrame.onload = () => {
+                hideLoading();
+                statusText.textContent = `Loaded: ${finalUrl}`;
+            };
+
+            browserFrame.onerror = () => {
+                hideLoading();
+                showPage('error');
+                statusText.textContent = 'Failed to load page';
+            };
+
+            try {
+                browserFrame.src = finalUrl;
+            } catch (error) {
+                console.error('Navigation error:', error);
+                showPage('error');
+                hideLoading();
+            }
+        }
+
+        function quickNavigate(url) {
+            urlInput.value = url;
+            navigate(url);
+        }
+
+        function goHome() {
+            currentUrl = '';
+            urlInput.value = '';
+            urlDisplay.textContent = '';
+            showPage('home');
+            statusText.textContent = 'Home';
+            addToHistory('home');
+        }
+
+        function goBack() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                const url = history[historyIndex];
+                updateNavigationButtons();
+                
+                if (url === 'home') {
+                    goHome();
+                } else {
+                    navigate(url);
+                }
+            }
+        }
+
+        function goForward() {
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                const url = history[historyIndex];
+                updateNavigationButtons();
+                
+                if (url === 'home') {
+                    goHome();
+                } else {
+                    navigate(url);
+                }
+            }
+        }
+
+        function refreshPage() {
+            if (currentUrl) {
+                navigate(currentUrl);
+            } else {
+                goHome();
+            }
+        }
+
+        // Event listeners
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                navigate();
+            }
+        });
+
+        // Handle iframe load events
+        browserFrame.addEventListener('load', () => {
+            try {
+                // Try to get the current URL from the iframe (may fail due to CORS)
+                const iframeUrl = browserFrame.contentWindow.location.href;
+                if (iframeUrl && iframeUrl !== 'about:blank') {
+                    urlInput.value = iframeUrl;
+                    urlDisplay.textContent = iframeUrl;
+                }
+            } catch (error) {
+                // Ignore CORS errors
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 'l':
+                        e.preventDefault();
+                        urlInput.focus();
+                        urlInput.select();
+                        break;
+                    case 'r':
+                        e.preventDefault();
+                        refreshPage();
+                        break;
+                }
+            }
+            
+            if (e.altKey) {
+                switch (e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        goBack();
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        goForward();
+                        break;
+                }
+            }
+        });
+
+        // Initialize
+        goHome();
+    </script>
+</body>
+</html> 

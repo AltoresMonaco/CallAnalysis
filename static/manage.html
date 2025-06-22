@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Steps & Prompts - Audio Transcript Analysis</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/sidebar.css" rel="stylesheet">
+    <script src="/static/utils.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.8s ease-out;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            height: 60px;
+            width: auto;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #273BEF;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #000001;
+            font-weight: 300;
+        }
+
+
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+
+        .tab-btn {
+            padding: 1rem 2rem;
+            border: 1px solid #dee2e9;
+            background: white;
+            color: #000001;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 1rem;
+        }
+
+        .tab-btn:hover {
+            background: #e8e7ff;
+            border-color: #273BEF;
+        }
+
+        .tab-btn.active {
+            background: #273BEF;
+            border-color: #273BEF;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #dee2e9;
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(39, 59, 239, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #000001;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #273BEF;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1e2fd6;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #e8e7ff;
+            color: #273BEF;
+            border: 1px solid #dee2e9;
+        }
+
+        .btn-secondary:hover {
+            background: #273BEF;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #22c55e;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+            transform: translateY(-1px);
+        }
+
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .step-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .step-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .step-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+
+        .step-id {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-family: monospace;
+            background: #e2e8f0;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+        }
+
+        .step-meta {
+            margin-bottom: 1rem;
+        }
+
+        .step-meta-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .step-meta-label {
+            color: #64748b;
+        }
+
+        .step-meta-value {
+            color: #1e293b;
+            font-weight: 500;
+        }
+
+        .step-order-badge {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .order-group-header {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .order-group-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        .order-group-description {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .step-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .step-status.enabled {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .step-status.disabled {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .step-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .prompts-list {
+            margin-bottom: 2rem;
+        }
+
+        .prompt-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .prompt-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .prompt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .prompt-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            font-family: monospace;
+        }
+
+        .prompt-info {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .prompt-usage {
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #64748b;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #273BEF;
+            box-shadow: 0 0 0 3px rgba(39, 59, 239, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 200px;
+            resize: vertical;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .form-checkbox {
+            margin-right: 0.5rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #64748b;
+        }
+
+        .loading i {
+            font-size: 2rem;
+            animation: spin 1s linear infinite;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .prompt-preview {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #475569;
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="/static/logo.png" alt="Logo" class="logo">
+            <h1>Steps & Prompts Management</h1>
+            <p>Configure processing steps and manage prompt templates</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('steps')">
+                <i class="fas fa-list-ol"></i>
+                Processing Steps
+            </button>
+            <button class="tab-btn" onclick="switchTab('prompts')">
+                <i class="fas fa-file-text"></i>
+                Prompt Templates
+            </button>
+        </div>
+
+        <!-- Steps Tab -->
+        <div id="steps-tab" class="tab-content active">
+            <div class="card">
+                <div class="section-header">
+                    <h2 class="section-title">Processing Steps Configuration</h2>
+                    <button class="btn btn-primary" onclick="openStepModal()">
+                        <i class="fas fa-plus"></i>
+                        Add New Step
+                    </button>
+                </div>
+                
+                <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 12px; padding: 1rem; margin-bottom: 2rem;">
+                    <h4 style="color: #0c4a6e; margin-bottom: 0.5rem;">
+                        <i class="fas fa-info-circle"></i>
+                        Sequential-Parallel Processing
+                    </h4>
+                    <p style="color: #0c4a6e; font-size: 0.9rem; margin: 0;">
+                        Steps with the same <strong>order number</strong> run in parallel. Steps with different order numbers run sequentially. 
+                        For example: Order 1 (transcription) → Order 2 (qualification + issues + categorization in parallel) → Order 3 (sentiment analysis).
+                        <br><strong>Multiple steps can share the same order number!</strong>
+                    </p>
+                </div>
+                
+                <div id="steps-loading" class="loading">
+                    <i class="fas fa-spinner"></i>
+                    <p>Loading steps...</p>
+                </div>
+                
+                <div id="steps-error" class="error" style="display: none;"></div>
+                <div id="steps-success" class="success" style="display: none;"></div>
+                
+                <div id="steps-grid" class="steps-grid">
+                    <!-- Steps will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Prompts Tab -->
+        <div id="prompts-tab" class="tab-content">
+            <div class="card">
+                <div class="section-header">
+                    <h2 class="section-title">Prompt Templates</h2>
+                    <button class="btn btn-primary" onclick="openPromptModal()">
+                        <i class="fas fa-plus"></i>
+                        Create New Prompt
+                    </button>
+                </div>
+                
+                <div id="prompts-loading" class="loading">
+                    <i class="fas fa-spinner"></i>
+                    <p>Loading prompts...</p>
+                </div>
+                
+                <div id="prompts-error" class="error" style="display: none;"></div>
+                <div id="prompts-success" class="success" style="display: none;"></div>
+                
+                <div id="prompts-list" class="prompts-list">
+                    <!-- Prompts will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step Modal -->
+    <div id="step-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Configure Step</h3>
+                <button class="close-btn" onclick="closeStepModal()">&times;</button>
+            </div>
+            
+            <form id="step-form">
+                <div class="form-group">
+                    <label class="form-label" for="step-id">Step ID</label>
+                    <input type="text" id="step-id" class="form-input" placeholder="e.g., sentiment_analysis" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="step-name">Step Name</label>
+                    <input type="text" id="step-name" class="form-input" placeholder="e.g., Sentiment Analysis" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="step-description">Description</label>
+                    <input type="text" id="step-description" class="form-input" placeholder="Brief description of what this step does">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="step-prompt-file">Prompt File</label>
+                    <select id="step-prompt-file" class="form-input" required>
+                        <option value="">Select a prompt file...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="step-result-key">Result Key</label>
+                    <input type="text" id="step-result-key" class="form-input" placeholder="e.g., sentiment" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="step-order">Processing Order</label>
+                    <input type="number" id="step-order" class="form-input" min="1" required>
+                    <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                        Steps with the same order number run in parallel. Lower numbers run first. Multiple steps can have the same order!
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center;">
+                        <input type="checkbox" id="step-enabled" class="form-checkbox" checked>
+                        <span class="form-label" style="margin-bottom: 0;">Enabled</span>
+                    </label>
+                </div>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Save Step
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="testStep()">
+                        <i class="fas fa-flask"></i>
+                        Test Step
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeStepModal()">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Prompt Modal -->
+    <div id="prompt-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Prompt Template</h3>
+                <button class="close-btn" onclick="closePromptModal()">&times;</button>
+            </div>
+            
+            <form id="prompt-form">
+                <div class="form-group">
+                    <label class="form-label" for="prompt-filename">Filename</label>
+                    <input type="text" id="prompt-filename" class="form-input" placeholder="e.g., sentiment.txt" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="prompt-description">Description</label>
+                    <input type="text" id="prompt-description" class="form-input" placeholder="Brief description of this prompt">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="prompt-content">Prompt Content</label>
+                    <textarea id="prompt-content" class="form-input form-textarea" placeholder="Enter your prompt template here..." required></textarea>
+                </div>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Save Prompt
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="testPrompt()">
+                        <i class="fas fa-flask"></i>
+                        Test Prompt
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closePromptModal()">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentSteps = {};
+        let currentPrompts = [];
+        let editingStep = null;
+        let editingPrompt = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            Sidebar.init();
+            loadSteps();
+            loadPrompts();
+        });
+
+        // === SIDEBAR EVENT HANDLERS ===
+        // Handled by shared Sidebar utility in utils.js
+
+        // Tab switching
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${tab}-tab`).classList.add('active');
+
+            // Load data if needed
+            if (tab === 'steps') {
+                loadSteps();
+            } else if (tab === 'prompts') {
+                loadPrompts();
+            }
+        }
+
+        // Load steps
+        async function loadSteps() {
+            try {
+                showLoading('steps');
+                hideMessage('steps');
+
+                const data = await API.get('/api/steps');
+                currentSteps = data.steps;
+                renderSteps();
+                hideLoading('steps');
+            } catch (error) {
+                console.error('Error loading steps:', error);
+                showError('steps', error.message);
+                hideLoading('steps');
+            }
+        }
+
+        // Render steps
+        function renderSteps() {
+            const grid = document.getElementById('steps-grid');
+            grid.innerHTML = '';
+
+            const sortedSteps = Object.entries(currentSteps)
+                .sort((a, b) => a[1].order - b[1].order);
+
+            if (sortedSteps.length === 0) {
+                grid.innerHTML = '<p style="text-align: center; color: #64748b; grid-column: 1/-1;">No steps configured. Add your first step to get started.</p>';
+                return;
+            }
+
+            // Group steps by order
+            const orderGroups = {};
+            sortedSteps.forEach(([stepId, step]) => {
+                if (!orderGroups[step.order]) {
+                    orderGroups[step.order] = [];
+                }
+                orderGroups[step.order].push([stepId, step]);
+            });
+
+            // Render each order group
+            Object.keys(orderGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(order => {
+                const stepsInOrder = orderGroups[order];
+                
+                // Create order group header
+                const orderHeader = document.createElement('div');
+                orderHeader.className = 'order-group-header';
+                orderHeader.style.gridColumn = '1 / -1';
+                
+                const isParallel = stepsInOrder.length > 1;
+                orderHeader.innerHTML = `
+                    <div class="order-group-title">
+                        <i class="fas ${isParallel ? 'fa-layer-group' : 'fa-play'}"></i>
+                        Order ${order} ${isParallel ? '(Parallel Processing)' : '(Sequential)'}
+                    </div>
+                    <div class="order-group-description">
+                        ${isParallel 
+                            ? `${stepsInOrder.length} steps will run simultaneously` 
+                            : 'Single step processing'
+                        }
+                    </div>
+                `;
+                grid.appendChild(orderHeader);
+
+                // Render steps in this order
+                stepsInOrder.forEach(([stepId, step]) => {
+                    const stepCard = createStepCard(stepId, step);
+                    grid.appendChild(stepCard);
+                });
+            });
+        }
+
+        // Create step card
+        function createStepCard(stepId, step) {
+            const card = document.createElement('div');
+            card.className = 'step-card';
+            
+            card.innerHTML = `
+                <div class="step-header">
+                    <div>
+                        <div class="step-title">
+                            ${step.name}
+                            <span class="step-order-badge">Order ${step.order}</span>
+                        </div>
+                        <div class="step-id">${stepId}</div>
+                    </div>
+                    <span class="step-status ${step.enabled ? 'enabled' : 'disabled'}">
+                        ${step.enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                </div>
+                
+                <div class="step-meta">
+                    <div class="step-meta-item">
+                        <span class="step-meta-label">Prompt:</span>
+                        <span class="step-meta-value">${step.prompt_file}</span>
+                    </div>
+                    <div class="step-meta-item">
+                        <span class="step-meta-label">Result Key:</span>
+                        <span class="step-meta-value">${step.result_key}</span>
+                    </div>
+                    ${step.description ? `
+                    <div class="step-meta-item" style="margin-top: 0.5rem;">
+                        <span style="color: #64748b; font-size: 0.85rem;">${step.description}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="step-actions">
+                    <button class="btn btn-secondary" onclick="editStep('${stepId}')">
+                        <i class="fas fa-edit"></i>
+                        Edit
+                    </button>
+                    <button class="btn ${step.enabled ? 'btn-secondary' : 'btn-success'}" 
+                            onclick="toggleStep('${stepId}', ${!step.enabled})">
+                        <i class="fas ${step.enabled ? 'fa-pause' : 'fa-play'}"></i>
+                        ${step.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteStep('${stepId}')">
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Load prompts
+        async function loadPrompts() {
+            try {
+                showLoading('prompts');
+                hideMessage('prompts');
+
+                const data = await API.get('/api/prompts');
+                currentPrompts = data.prompts;
+                renderPrompts();
+                updatePromptOptions();
+                hideLoading('prompts');
+            } catch (error) {
+                console.error('Error loading prompts:', error);
+                showError('prompts', error.message);
+                hideLoading('prompts');
+            }
+        }
+
+        // Render prompts
+        function renderPrompts() {
+            const list = document.getElementById('prompts-list');
+            list.innerHTML = '';
+
+            if (currentPrompts.length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: #64748b;">No prompts found. Create your first prompt to get started.</p>';
+                return;
+            }
+
+            currentPrompts.forEach(prompt => {
+                const promptItem = createPromptItem(prompt);
+                list.appendChild(promptItem);
+            });
+        }
+
+        // Create prompt item
+        function createPromptItem(prompt) {
+            const item = document.createElement('div');
+            item.className = 'prompt-item';
+            
+            const usedBySteps = prompt.used_by_steps || [];
+            const preview = prompt.content.length > 200 
+                ? prompt.content.substring(0, 200) + '...' 
+                : prompt.content;
+
+            item.innerHTML = `
+                <div class="prompt-header">
+                    <div class="prompt-name">${prompt.filename}</div>
+                    <div>
+                        ${usedBySteps.map(step => 
+                            `<span class="prompt-usage">Used by: ${step}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+                
+                <div class="prompt-info">
+                    <span>Size: ${formatBytes(prompt.size)}</span>
+                    <span>Used by ${usedBySteps.length} step(s)</span>
+                </div>
+                
+                <div class="prompt-preview">${preview}</div>
+                
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="editPrompt('${prompt.filename}')">
+                        <i class="fas fa-edit"></i>
+                        Edit
+                    </button>
+                    <button class="btn btn-secondary" onclick="testPromptByFilename('${prompt.filename}')">
+                        <i class="fas fa-flask"></i>
+                        Test
+                    </button>
+                    <button class="btn btn-danger" onclick="deletePrompt('${prompt.filename}')" 
+                            ${usedBySteps.length > 0 ? 'disabled title="Cannot delete: prompt is in use"' : ''}>
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                </div>
+            `;
+
+            return item;
+        }
+
+        // Update prompt options in step form
+        function updatePromptOptions() {
+            const select = document.getElementById('step-prompt-file');
+            const currentValue = select.value;
+            
+            select.innerHTML = '<option value="">Select a prompt file...</option>';
+            
+            currentPrompts.forEach(prompt => {
+                const option = document.createElement('option');
+                option.value = prompt.filename;
+                option.textContent = prompt.filename;
+                select.appendChild(option);
+            });
+            
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        }
+
+        // Step management functions
+        function openStepModal(stepId = null) {
+            editingStep = stepId;
+            const modal = document.getElementById('step-modal');
+            const form = document.getElementById('step-form');
+            
+            // Reset form
+            form.reset();
+            
+            if (stepId && currentSteps[stepId]) {
+                // Edit mode
+                const step = currentSteps[stepId];
+                document.getElementById('step-id').value = stepId;
+                document.getElementById('step-id').disabled = true;
+                document.getElementById('step-name').value = step.name;
+                document.getElementById('step-description').value = step.description || '';
+                document.getElementById('step-prompt-file').value = step.prompt_file;
+                document.getElementById('step-result-key').value = step.result_key;
+                document.getElementById('step-order').value = step.order;
+                document.getElementById('step-enabled').checked = step.enabled;
+                document.querySelector('#step-modal .modal-title').textContent = 'Edit Step';
+            } else {
+                // Create mode
+                document.getElementById('step-id').disabled = false;
+                document.getElementById('step-order').value = Math.max(...Object.values(currentSteps).map(s => s.order), 0) + 1;
+                document.querySelector('#step-modal .modal-title').textContent = 'Create New Step';
+            }
+            
+            updatePromptOptions();
+            modal.style.display = 'block';
+        }
+
+        function closeStepModal() {
+            document.getElementById('step-modal').style.display = 'none';
+            editingStep = null;
+        }
+
+        function editStep(stepId) {
+            openStepModal(stepId);
+        }
+
+        async function toggleStep(stepId, enabled) {
+            try {
+                const step = { ...currentSteps[stepId], enabled };
+                const response = await fetch(`/api/steps/${stepId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(step)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to update step');
+                }
+
+                showSuccess('steps', `Step ${enabled ? 'enabled' : 'disabled'} successfully`);
+                loadSteps();
+            } catch (error) {
+                console.error('Error toggling step:', error);
+                showError('steps', error.message);
+            }
+        }
+
+        async function deleteStep(stepId) {
+            if (!confirm(`Are you sure you want to delete step "${stepId}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/steps/${stepId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to delete step');
+                }
+
+                showSuccess('steps', 'Step deleted successfully');
+                loadSteps();
+            } catch (error) {
+                console.error('Error deleting step:', error);
+                showError('steps', error.message);
+            }
+        }
+
+        // Prompt management functions
+        function openPromptModal(filename = null) {
+            editingPrompt = filename;
+            const modal = document.getElementById('prompt-modal');
+            const form = document.getElementById('prompt-form');
+            
+            // Reset form
+            form.reset();
+            
+            if (filename) {
+                // Edit mode - load prompt content
+                loadPromptForEdit(filename);
+                document.querySelector('#prompt-modal .modal-title').textContent = 'Edit Prompt Template';
+            } else {
+                // Create mode
+                document.querySelector('#prompt-modal .modal-title').textContent = 'Create New Prompt Template';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        async function loadPromptForEdit(filename) {
+            try {
+                const response = await fetch(`/api/prompts/${filename}`);
+                const prompt = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(prompt.detail || 'Failed to load prompt');
+                }
+
+                document.getElementById('prompt-filename').value = filename;
+                document.getElementById('prompt-filename').disabled = true;
+                document.getElementById('prompt-description').value = prompt.description || '';
+                document.getElementById('prompt-content').value = prompt.content;
+            } catch (error) {
+                console.error('Error loading prompt:', error);
+                showError('prompts', error.message);
+                closePromptModal();
+            }
+        }
+
+        function closePromptModal() {
+            document.getElementById('prompt-modal').style.display = 'none';
+            editingPrompt = null;
+            document.getElementById('prompt-filename').disabled = false;
+        }
+
+        function editPrompt(filename) {
+            openPromptModal(filename);
+        }
+
+        async function deletePrompt(filename) {
+            if (!confirm(`Are you sure you want to delete prompt "${filename}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/prompts/${filename}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to delete prompt');
+                }
+
+                showSuccess('prompts', 'Prompt deleted successfully');
+                loadPrompts();
+            } catch (error) {
+                console.error('Error deleting prompt:', error);
+                showError('prompts', error.message);
+            }
+        }
+
+        // Form submissions
+        document.getElementById('step-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const stepData = {
+                step_id: document.getElementById('step-id').value,
+                name: document.getElementById('step-name').value,
+                description: document.getElementById('step-description').value || undefined,
+                prompt_file: document.getElementById('step-prompt-file').value,
+                result_key: document.getElementById('step-result-key').value,
+                order: parseInt(document.getElementById('step-order').value),
+                enabled: document.getElementById('step-enabled').checked
+            };
+
+            try {
+                // Use editingStep if we're editing, otherwise use the form value
+                const stepId = editingStep || stepData.step_id;
+                const response = await fetch(`/api/steps/${stepId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(stepData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save step');
+                }
+
+                showSuccess('steps', editingStep ? 'Step updated successfully' : 'Step created successfully');
+                closeStepModal();
+                loadSteps();
+            } catch (error) {
+                console.error('Error saving step:', error);
+                showError('steps', error.message);
+            }
+        });
+
+        document.getElementById('prompt-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const filename = document.getElementById('prompt-filename').value;
+            const promptData = {
+                filename: filename,
+                description: document.getElementById('prompt-description').value || undefined,
+                content: document.getElementById('prompt-content').value
+            };
+
+            try {
+                const response = await fetch(`/api/prompts/${filename}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(promptData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save prompt');
+                }
+
+                showSuccess('prompts', editingPrompt ? 'Prompt updated successfully' : 'Prompt created successfully');
+                closePromptModal();
+                loadPrompts();
+            } catch (error) {
+                console.error('Error saving prompt:', error);
+                showError('prompts', error.message);
+            }
+        });
+
+        // Test functions
+        async function testStep() {
+            const promptFile = document.getElementById('step-prompt-file').value;
+            if (!promptFile) {
+                alert('Please select a prompt file first');
+                return;
+            }
+
+            await testPromptByFilename(promptFile);
+        }
+
+        async function testPrompt() {
+            const content = document.getElementById('prompt-content').value;
+            if (!content.trim()) {
+                alert('Please enter prompt content first');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/test-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt_content: content,
+                        test_transcript: 'This is a test transcript for prompt validation.'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(`Prompt test successful!\n\nModel: ${result.model_used}\nResponse: ${result.ollama_response.substring(0, 200)}...`);
+                } else {
+                    alert(`Prompt test failed: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Test failed: ${error.message}`);
+            }
+        }
+
+        async function testPromptByFilename(filename) {
+            try {
+                const response = await fetch('/api/test-prompt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt_filename: filename,
+                        test_transcript: 'This is a test transcript for prompt validation.'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(`Prompt test successful!\n\nFile: ${filename}\nModel: ${result.model_used}\nResponse: ${result.ollama_response.substring(0, 200)}...`);
+                } else {
+                    alert(`Prompt test failed: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Test failed: ${error.message}`);
+            }
+        }
+
+        // Utility functions
+        function showLoading(section) {
+            document.getElementById(`${section}-loading`).style.display = 'block';
+        }
+
+        function hideLoading(section) {
+            document.getElementById(`${section}-loading`).style.display = 'none';
+        }
+
+        function showError(section, message) {
+            const errorDiv = document.getElementById(`${section}-error`);
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => hideMessage(section), 5000);
+        }
+
+        function showSuccess(section, message) {
+            const successDiv = document.getElementById(`${section}-success`);
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            setTimeout(() => hideMessage(section), 3000);
+        }
+
+        function hideMessage(section) {
+            document.getElementById(`${section}-error`).style.display = 'none';
+            document.getElementById(`${section}-success`).style.display = 'none';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Close modals when clicking outside
+        window.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+    </script>
+    <script src="/static/sidebar.js"></script>
+</body>
+</html> 

@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transcript Analysis</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/sidebar.css" rel="stylesheet">
+    <script src="/static/utils.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.8s ease-out;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            height: 80px;
+            width: auto;
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #273BEF;
+            margin-bottom: 0.5rem;
+            text-shadow: none;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #000001;
+            font-weight: 300;
+            margin: 0;
+        }
+
+        .dev-tools {
+            background: #f8f9fa;
+            border: 1px solid #dee2e9;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            animation: fadeInUp 0.8s ease-out 0.4s both;
+        }
+
+        .dev-tools h3 {
+            color: #273BEF;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .tool-card {
+            background: white;
+            border: 1px solid #dee2e9;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: #273BEF;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 1rem;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(39, 59, 239, 0.15);
+            border-color: #273BEF;
+        }
+
+        .tool-icon {
+            font-size: 2.5rem;
+            color: #273BEF;
+        }
+
+        .tool-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .tool-description {
+            font-size: 0.9rem;
+            color: #666;
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .results-btn {
+            background: #e8e7ff;
+            border: 1px solid #dee2e9;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: #273BEF;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .results-btn:hover {
+            background: #273BEF;
+            color: white;
+        }
+
+        .main-card {
+            background: white;
+            border: 1px solid #dee2e9;
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px rgba(39, 59, 239, 0.1);
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+            margin-bottom: 2rem;
+        }
+
+        .upload-section {
+            margin-bottom: 2rem;
+        }
+
+        .upload-area {
+            border: 2px dashed #dee2e9;
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            background: #ffffff;
+        }
+
+        .upload-area:hover {
+            border-color: #273BEF;
+            background: #e8e7ff;
+            transform: translateY(-2px);
+        }
+
+        .upload-area.dragover {
+            border-color: #273BEF;
+            background: #e8e7ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #dee2e9;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover .upload-icon {
+            color: #273BEF;
+            transform: scale(1.1);
+        }
+
+        .upload-text {
+            color: #000001;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-subtext {
+            color: #000001;
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+
+        .mode-btn {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid #dee2e9;
+            background: white;
+            color: #000001;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .mode-btn:hover {
+            background: #e8e7ff;
+            border-color: #273BEF;
+            transform: translateY(-1px);
+        }
+
+        .mode-btn.active {
+            background: #273BEF;
+            border-color: #273BEF;
+            color: white;
+        }
+
+        .process-btn {
+            width: 100%;
+            padding: 1rem 2rem;
+            background: #273BEF;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(39, 59, 239, 0.3);
+            background: #1e2fd6;
+        }
+
+        .process-btn:disabled {
+            background: #dee2e9;
+            color: #000001;
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Progress Tracking Styles */
+        .progress-container {
+            display: none;
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #dee2e9;
+        }
+
+        .progress-title {
+            color: #000001;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .progress-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .progress-step {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid #dee2e9;
+            transition: all 0.3s ease;
+        }
+
+        .progress-step.active {
+            background: #e8e7ff;
+            border-color: #273BEF;
+        }
+
+        .progress-step.completed {
+            background: #e8f5e8;
+            border-color: #22c55e;
+        }
+
+        .progress-step.error {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #000001;
+            font-weight: 500;
+        }
+
+        .step-status {
+            font-size: 0.9rem;
+            color: #000001;
+            opacity: 0.7;
+        }
+
+        .step-progress-bar {
+            height: 4px;
+            background: #dee2e9;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-progress-fill {
+            height: 100%;
+            background: #273BEF;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .step-message {
+            color: #000001;
+            opacity: 0.8;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .step-details {
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: #000001;
+            opacity: 0.6;
+        }
+
+        .step-icon {
+            width: 20px;
+            text-align: center;
+        }
+
+        .step-icon.pending {
+            color: #dee2e9;
+        }
+
+        .step-icon.active {
+            color: #273BEF;
+            animation: pulse 2s infinite;
+        }
+
+        .step-icon.completed {
+            color: #22c55e;
+        }
+
+        .step-icon.error {
+            color: #ef4444;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #000001;
+            margin: 2rem 0;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #dee2e9;
+            border-top: 3px solid #273BEF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        .results {
+            display: none;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .result-section {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #dee2e9;
+        }
+
+        .result-title {
+            color: #000001;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .result-content {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1rem;
+            color: #000001;
+            line-height: 1.6;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid #dee2e9;
+        }
+
+        .status-indicator {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            color: white;
+            font-weight: 500;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .status-indicator.show {
+            transform: translateX(0);
+        }
+
+        .status-success {
+            background: #22c55e;
+        }
+
+        .status-error {
+            background: #ef4444;
+        }
+
+        /* Settings Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 1, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(39, 59, 239, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+            border: 1px solid #dee2e9;
+        }
+
+        .modal-header {
+            background: #e8e7ff;
+            padding: 1.5rem;
+            border-radius: 20px 20px 0 0;
+            border-bottom: 1px solid #dee2e9;
+        }
+
+        .modal-title {
+            color: #273BEF;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            color: #000001;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #dee2e9;
+            background: white;
+            border-radius: 8px;
+            color: #000001;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #273BEF;
+            background: #e8e7ff;
+        }
+
+        .form-input::placeholder {
+            color: #000001;
+            opacity: 0.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            padding: 1.5rem;
+            border-top: 1px solid #dee2e9;
+            background: #f8f9fa;
+            border-radius: 0 0 20px 20px;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #273BEF;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(39, 59, 239, 0.3);
+            background: #1e2fd6;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #000001;
+            border: 1px solid #dee2e9;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e7ff;
+            border-color: #273BEF;
+        }
+
+        .btn-test {
+            background: #273BEF;
+            color: white;
+            margin-right: auto;
+        }
+
+        .btn-test:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(39, 59, 239, 0.3);
+            background: #1e2fd6;
+        }
+
+        .close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            color: #000001;
+            opacity: 0.7;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close:hover {
+            color: #273BEF;
+            opacity: 1;
+        }
+
+        .connection-status {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            border: 1px solid #dee2e9;
+            background: white;
+            color: #000001;
+        }
+
+        .connection-status.success {
+            background: #e8f5e8;
+            border-color: #22c55e;
+            color: #16a34a;
+        }
+
+        .connection-status.error {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #dc2626;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .main-card {
+                padding: 1.5rem;
+            }
+
+            .mode-selector {
+                flex-direction: column;
+            }
+
+            .progress-steps {
+                gap: 0.75rem;
+            }
+
+            .step-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar will be loaded here dynamically -->
+    <div id="sidebar-container"></div>
+
+    <div class="container">
+        <div class="header">
+            <img src="/static/logo.png" alt="Logo" class="logo">
+            <div class="header-content">
+                <h1>Audio Transcript Analysis</h1>
+                <p>AI-powered transcription and call analysis</p>
+                <!-- Temporary test button -->
+                <button onclick="openSettings()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #273BEF; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                    🔧 Test Settings (Direct)
+                </button>
+            </div>
+        </div>
+
+        <div class="main-card">
+            <div class="upload-section">
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">Click to upload or drag & drop</div>
+                    <div class="upload-subtext">Supports WAV, MP3, MP4, M4A, FLAC, OGG</div>
+                </div>
+                <input type="file" id="fileInput" accept=".wav,.mp3,.mp4,.m4a,.flac,.ogg">
+            </div>
+
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="full">
+                    <i class="fas fa-brain"></i> Full Analysis
+                </button>
+                <button class="mode-btn" data-mode="transcribe">
+                    <i class="fas fa-file-alt"></i> Transcribe Only
+                </button>
+            </div>
+
+            <button class="process-btn" id="processBtn" disabled>
+                <i class="fas fa-play"></i> Process Audio
+            </button>
+        </div>
+
+       
+        <div class="main-card">
+
+            <!-- Enhanced Progress Tracking -->
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-title">
+                    <i class="fas fa-tasks"></i> Processing Progress
+                </div>
+                <div class="progress-steps" id="progressSteps">
+                    <!-- Progress steps will be dynamically added here -->
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing your audio file...</p>
+            </div>
+        </div>
+
+        <div class="results" id="results">
+            <div class="result-section">
+                <div class="result-title">
+                    <i class="fas fa-file-alt"></i> Transcript
+                </div>
+                <div class="result-content" id="transcriptContent"></div>
+            </div>
+
+            <div class="result-section" id="summarySection">
+                <div class="result-title">
+                    <i class="fas fa-chart-line"></i> Call Qualification & Summary
+                </div>
+                <div class="result-content" id="summaryContent"></div>
+            </div>
+
+            <div class="result-section" id="issuesSection">
+                <div class="result-title">
+                    <i class="fas fa-exclamation-triangle"></i> Critical Issues
+                </div>
+                <div class="result-content" id="issuesContent"></div>
+            </div>
+
+            <div class="result-section" id="categorisationSection">
+                <div class="result-title">
+                    <i class="fas fa-tags"></i> Categorisation
+                </div>
+                <div class="result-content" id="categorisationContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <i class="fas fa-cog"></i> Settings
+                </h2>
+                <span class="close" onclick="closeSettings()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="ollamaUrl">Ollama URL</label>
+                    <input type="text" id="ollamaUrl" class="form-input" 
+                           placeholder="http://localhost:11434/api/generate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ollamaModel">AI Model</label>
+                    <input type="text" id="ollamaModel" class="form-input" 
+                           placeholder="llama3">
+                </div>
+                <div id="connectionStatus" class="connection-status" style="display: none;"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-test" onclick="testConnection()">
+                    <i class="fas fa-plug"></i> Test Connection
+                </button>
+                <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-indicator" id="statusIndicator"></div>
+
+    <script>
+        // === MODERN STATE MANAGEMENT ===
+        class TaskTracker {
+            constructor() {
+                this.currentTask = null;
+                this.pollInterval = null;
+                this.pollCount = 0;
+                this.maxPollAttempts = 300; // 5 minutes at 1 second intervals
+                this.stepElements = new Map();
+            }
+
+            startTask(taskId, mode) {
+                this.currentTask = {
+                    id: taskId,
+                    mode: mode,
+                    startTime: Date.now(),
+                    status: 'initializing'
+                };
+                this.pollCount = 0;
+                this.initializeSteps(mode);
+                this.startPolling();
+                console.log(`[TaskTracker] Started tracking task: ${taskId} (${mode} mode)`);
+            }
+
+            initializeSteps(mode) {
+                const container = document.getElementById('progressSteps');
+                const steps = progressSteps[mode];
+                
+                container.innerHTML = '';
+                this.stepElements.clear();
+                
+                steps.forEach(step => {
+                    const stepElement = this.createStepElement(step);
+                    container.appendChild(stepElement);
+                    this.stepElements.set(step.id, stepElement);
+                });
+                
+                document.getElementById('progressContainer').style.display = 'block';
+                console.log(`[TaskTracker] Initialized ${steps.length} steps for ${mode} mode`);
+            }
+
+            createStepElement(step) {
+                const stepElement = document.createElement('div');
+                stepElement.className = 'progress-step';
+                stepElement.id = `step-${step.id}`;
+                
+                stepElement.innerHTML = `
+                    <div class="step-header">
+                        <div class="step-title">
+                            <div class="step-icon pending">
+                                <i class="${step.icon}"></i>
+                            </div>
+                            ${step.title}
+                        </div>
+                        <div class="step-status">Pending</div>
+                    </div>
+                    <div class="step-progress-bar">
+                        <div class="step-progress-fill"></div>
+                    </div>
+                    <div class="step-message">Waiting to start...</div>
+                    <div class="step-details"></div>
+                `;
+                
+                return stepElement;
+            }
+
+            updateStep(stepId, stepData) {
+                const stepElement = this.stepElements.get(stepId);
+                if (!stepElement) {
+                    console.warn(`[TaskTracker] Step element not found: ${stepId}`);
+                    return;
+                }
+
+                const { status, progress, message, details } = stepData;
+                
+                // Update visual state
+                stepElement.className = `progress-step ${status}`;
+                
+                // Update icon
+                const icon = stepElement.querySelector('.step-icon');
+                icon.className = `step-icon ${status}`;
+                
+                // Update status text
+                const statusText = stepElement.querySelector('.step-status');
+                statusText.textContent = this.formatStatus(status);
+                
+                // Update progress bar
+                const progressBar = stepElement.querySelector('.step-progress-fill');
+                progressBar.style.width = `${progress}%`;
+                
+                // Update message
+                const messageText = stepElement.querySelector('.step-message');
+                messageText.textContent = message;
+                
+                // Update details
+                if (details && Object.keys(details).length > 0) {
+                    const detailsText = stepElement.querySelector('.step-details');
+                    detailsText.textContent = this.formatDetails(details);
+                }
+                
+                console.log(`[TaskTracker] Updated step ${stepId}: ${status} (${progress}%) - ${message}`);
+            }
+
+            formatStatus(status) {
+                const statusMap = {
+                    'pending': 'Pending',
+                    'in_progress': 'In Progress',
+                    'completed': 'Completed',
+                    'error': 'Error'
+                };
+                return statusMap[status] || status;
+            }
+
+            formatDetails(details) {
+                const parts = [];
+                if (details.transcript_length) parts.push(`Length: ${details.transcript_length} chars`);
+                if (details.language) parts.push(`Language: ${details.language}`);
+                if (details.response_length) parts.push(`Response: ${details.response_length} chars`);
+                if (details.model_used) parts.push(`Model: ${details.model_used}`);
+                return parts.join(' • ');
+            }
+
+            async startPolling() {
+                if (!this.currentTask) return;
+                
+                this.pollInterval = setInterval(async () => {
+                    await this.pollProgress();
+                }, 1000); // Poll every second
+                
+                // Initial poll
+                await this.pollProgress();
+            }
+
+            async pollProgress() {
+                if (!this.currentTask || this.pollCount >= this.maxPollAttempts) {
+                    this.stopPolling();
+                    return;
+                }
+
+                this.pollCount++;
+                
+                try {
+                    const response = await fetch(`/progress/${this.currentTask.id}`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const taskState = await response.json();
+                    console.log(`[TaskTracker] Poll #${this.pollCount} - Task status: ${taskState.status}`, taskState);
+                    
+                    this.processTaskState(taskState);
+                    
+                } catch (error) {
+                    console.error(`[TaskTracker] Poll error:`, error);
+                    
+                    // Continue polling on temporary errors
+                    if (this.pollCount < this.maxPollAttempts) {
+                        console.log(`[TaskTracker] Continuing to poll despite error...`);
+                    } else {
+                        this.handleError('Max poll attempts reached');
+                    }
+                }
+            }
+
+            processTaskState(taskState) {
+                // Update current task status
+                this.currentTask.status = taskState.status;
+                
+                // Update all steps based on backend state
+                for (const [stepId, stepData] of Object.entries(taskState.steps)) {
+                    this.updateStep(stepId, stepData);
+                }
+                
+                // Check if task is complete
+                if (taskState.status === 'completed') {
+                    console.log(`[TaskTracker] Task completed successfully`);
+                    this.handleCompletion(taskState);
+                } else if (taskState.status === 'failed') {
+                    console.log(`[TaskTracker] Task failed: ${taskState.error_message}`);
+                    this.handleError(taskState.error_message || 'Task failed');
+                } else {
+                    console.log(`[TaskTracker] Task still processing (${taskState.status})...`);
+                }
+            }
+
+            async handleCompletion(taskState) {
+                this.stopPolling();
+                
+                // Show success message
+                UI.showStatus('Processing completed successfully!', 'success');
+                
+                // Fetch and display results
+                try {
+                    const results = await API.get(`/results/${this.currentTask.id}`);
+                    this.displayResults(results);
+                } catch (error) {
+                    console.error('[TaskTracker] Error fetching results:', error);
+                    UI.showStatus('Processing completed but failed to fetch results', 'error');
+                }
+            }
+
+            handleError(errorMessage) {
+                this.stopPolling();
+                UI.showStatus(`Processing failed: ${errorMessage}`, 'error');
+                
+                // Mark any remaining pending steps as error
+                this.stepElements.forEach((element, stepId) => {
+                    if (element.classList.contains('progress-step') && 
+                        !element.classList.contains('completed') && 
+                        !element.classList.contains('error')) {
+                        this.updateStep(stepId, {
+                            status: 'error',
+                            progress: 0,
+                            message: 'Step failed due to error',
+                            details: {}
+                        });
+                    }
+                });
+            }
+
+            displayResults(results) {
+                const resultsContainer = document.getElementById('results');
+                resultsContainer.style.display = 'block';
+                
+                // Show transcript if available
+                if (results.transcript) {
+                    document.getElementById('transcriptContent').textContent = results.transcript;
+                }
+                
+                // Show analysis results for full mode
+                if (this.currentTask.mode === 'full') {
+                    if (results.summary) {
+                        document.getElementById('summaryContent').textContent = JSON.stringify(results.summary, null, 2);
+                        document.getElementById('summarySection').style.display = 'block';
+                    }
+                    
+                    if (results.issues) {
+                        document.getElementById('issuesContent').textContent = JSON.stringify(results.issues, null, 2);
+                        document.getElementById('issuesSection').style.display = 'block';
+                    }
+                    
+                    if (results.categorisation) {
+                        document.getElementById('categorisationContent').textContent = JSON.stringify(results.categorisation, null, 2);
+                        document.getElementById('categorisationSection').style.display = 'block';
+                    }
+                }
+                
+                console.log('[TaskTracker] Results displayed successfully');
+            }
+
+            stopPolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                    console.log('[TaskTracker] Stopped polling');
+                }
+            }
+
+            reset() {
+                this.stopPolling();
+                this.currentTask = null;
+                this.pollCount = 0;
+                this.stepElements.clear();
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('results').style.display = 'none';
+                console.log('[TaskTracker] Reset complete');
+            }
+        }
+
+        // === GLOBAL STATE ===
+        let selectedFile = null;
+        let currentMode = 'full';
+        const taskTracker = new TaskTracker();
+
+        // Progress steps configuration
+        const progressSteps = {
+            full: [
+                { id: 'transcription', title: 'Audio Transcription', icon: 'fas fa-microphone' },
+                { id: 'qualification', title: 'Call Qualification & Analysis', icon: 'fas fa-chart-line' },
+                { id: 'critical_issues', title: 'Critical Issues Analysis', icon: 'fas fa-exclamation-triangle' },
+                { id: 'categorisation', title: 'Call Categorization', icon: 'fas fa-tags' }
+            ],
+            transcribe: [
+                { id: 'transcription', title: 'Audio Transcription', icon: 'fas fa-microphone' }
+            ]
+        };
+
+        // === EVENT HANDLERS ===
+        window.addEventListener('load', async () => {
+            console.log('[Main] Page loaded, initializing...');
+            await loadSettings();
+            
+            console.log('[Main] About to initialize sidebar...');
+            Sidebar.init();
+            console.log('[Main] Sidebar initialized');
+            
+            // Check if we should open settings automatically
+            if (window.location.hash === '#settings') {
+                console.log('[Main] Opening settings from URL hash');
+                openSettings();
+                // Clear the hash
+                history.replaceState(null, null, window.location.pathname);
+            }
+            
+            console.log('[Main] Initialization complete');
+        });
+
+        // === SIDEBAR EVENT HANDLERS ===
+        // Handled by shared Sidebar utility in utils.js
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.querySelector('.upload-area');
+        const processBtn = document.getElementById('processBtn');
+
+        fileInput.addEventListener('change', handleFileSelect);
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+                console.log(`[UI] Mode changed to: ${currentMode}`);
+            });
+        });
+
+        processBtn.addEventListener('click', processAudio);
+
+        // === CORE FUNCTIONS ===
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFile = file;
+                updateUploadArea(file.name);
+                processBtn.disabled = false;
+                console.log(`[UI] File selected: ${file.name}`);
+            }
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                selectedFile = file;
+                updateUploadArea(file.name);
+                processBtn.disabled = false;
+                console.log(`[UI] File dropped: ${file.name}`);
+            }
+        }
+
+        function updateUploadArea(filename) {
+            const uploadText = uploadArea.querySelector('.upload-text');
+            const uploadIcon = uploadArea.querySelector('.upload-icon i');
+            uploadText.textContent = `Selected: ${filename}`;
+            uploadIcon.className = 'fas fa-file-audio';
+        }
+
+        async function processAudio() {
+            if (!selectedFile) {
+                console.warn('[UI] No file selected');
+                return;
+            }
+
+            console.log(`[UI] Starting ${currentMode} processing for: ${selectedFile.name}`);
+            
+            // Reset previous state
+            taskTracker.reset();
+            processBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const endpoint = currentMode === 'full' ? '/analyze-audio' : '/transcribe-only';
+                console.log(`[UI] Sending request to: ${endpoint}`);
+                
+                const data = await API.postFormData(endpoint, formData);
+                console.log(`[UI] Received response:`, data);
+                
+                if (currentMode === 'transcribe' && data.status === 'completed') {
+                    // Handle immediate transcription result
+                    UI.showStatus('Transcription completed!', 'success');
+                    document.getElementById('results').style.display = 'block';
+                    document.getElementById('transcriptContent').textContent = data.transcript;
+                } else {
+                    // Start tracking the task
+                    taskTracker.startTask(data.task_id, currentMode);
+                }
+
+            } catch (error) {
+                console.error('[UI] Processing error:', error);
+                UI.showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                processBtn.disabled = false;
+            }
+        }
+
+        // === SETTINGS FUNCTIONS ===
+        async function loadSettings() {
+            try {
+                const settings = await API.get('/settings');
+                document.getElementById('ollamaUrl').value = settings.ollama_url;
+                document.getElementById('ollamaModel').value = settings.ollama_model;
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        function openSettings() {
+            console.log('[Main] openSettings called');
+            UI.showModal('settingsModal');
+            loadSettings();
+            console.log('[Main] Settings modal should be open');
+        }
+
+        // Make openSettings globally available for sidebar
+        window.openSettings = openSettings;
+
+        function closeSettings() {
+            UI.hideModal('settingsModal');
+            document.getElementById('connectionStatus').style.display = 'none';
+        }
+
+        async function testConnection() {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.textContent = 'Testing connection...';
+            statusDiv.className = 'connection-status';
+
+            try {
+                const result = await API.post('/test-ollama');
+                
+                if (result.status === 'success') {
+                    statusDiv.textContent = `✅ ${result.message} - Model: ${result.model}`;
+                    statusDiv.className = 'connection-status success';
+                } else {
+                    statusDiv.textContent = `❌ ${result.message}`;
+                    statusDiv.className = 'connection-status error';
+                }
+            } catch (error) {
+                statusDiv.textContent = `❌ Connection test failed: ${error.message}`;
+                statusDiv.className = 'connection-status error';
+            }
+        }
+
+        async function saveSettings() {
+            const ollamaUrl = document.getElementById('ollamaUrl').value.trim();
+            const ollamaModel = document.getElementById('ollamaModel').value.trim();
+
+            if (!ollamaUrl || !ollamaModel) {
+                UI.showStatus('Please fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await API.post('/settings', {
+                    ollama_url: ollamaUrl,
+                    ollama_model: ollamaModel
+                });
+
+                UI.showStatus('Settings saved successfully!', 'success');
+                closeSettings();
+            } catch (error) {
+                UI.showStatus(`Error saving settings: ${error.message}`, 'error');
+            }
+        }
+
+        // === UTILITY FUNCTIONS ===
+        // All utility functions are now in utils.js
+
+        // Close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('settingsModal');
+            if (event.target === modal) {
+                closeSettings();
+            }
+        });
+    </script>
+    <script src="/static/sidebar.js"></script>
+</body>
+</html>

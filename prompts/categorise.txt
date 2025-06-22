@@ -1,0 +1,369 @@
+Dans le cadre de cet appel, fournit moi un JSON qui catégorise le ou les sujets de l'appel selon les typologies commerciales et techniques les plus juste:
+
+Selectionne un sujet très clairement présenté et discuté:
+
+
+
+Mobile	Renseignement commercial sur appareils mobile
+Mobile	Renseignement commercial sur offres/options mobile
+Mobile	Renseignement commercial sur SMS Court/ Push
+Voip	Renseignement commercial sur VoIP
+MTTV	Renseignement commercial relatif à MTTV
+TV Docsis	Renseignement commercial sur TV Docsis
+Internet Docsis	Renseignement commercial sur offre/options internet Docsis
+Mails/NDD	Renseignement commercial sur offre Mails/NDD
+Internet Fibre	Renseignement commercial sur offre/options Fibre
+Trunksip	Renseignement commercial sur offre/options Trunksip
+Legacy Internet	Renseignement commercial sur offre/options Legacy Internet
+Legacy Fixe	Renseignement commercial sur offre/options Legacy Fixe
+Connectivity	Renseignement commercial sur offre Connectivity
+Hebergement/Cloud	Renseignement commercial sur offre Hebergement/Cloud
+Mobile	Changement d'offre mobile (upgrade / downgrade)
+Mobile	Ajout / suppression d'option mobile
+Mobile	Résiliation d'offre mobile
+Mobile	Souscription offre mobile
+MTTV	Souscription offre MTTV
+MTTV	Résiliation offre MTTV
+MTTV	Location Apple TV
+MTTV	Restitution Apple TV
+MTTV	Souscription de pack de chaînes MTTV
+MTTV	Résiliation de pack de chaînes MTTV
+TV Docsis	Souscription box Docsis additionnelle
+TV Docsis	Résiliation box Docsis additionnelle
+TV Docsis	Souscription pack TV Docsis
+TV Docsis	Résiliation pack TV Docsis
+TV Docsis	Déplacement / ajout prise TV Docsis
+Internet Docsis	Changement Offre/Ajout suppression option internet Docsis
+Internet Docsis	Déplacement / ajout de prise internet Docsis
+Internet Docsis	Souscription Offre Docsis
+Internet Docsis	Résiliation Offre Docsis
+Mails/NDD	Résiliation offre mails/NDD
+Mails/NDD	Souscription offre mails/NDD
+Internet Fibre	Changement offre fibre
+Internet Fibre	Ajout/Suppression option fibre
+Internet Fibre	Déplacement prise fibre
+Internet Fibre	Souscription Offre Fibre
+Internet Fibre	Résiliation Offre Fibre
+Trunksip	Souscription Offre Trunksip
+Trunksip	Résiliation Offre Trunksip
+Trunksip	Modification Offre Trunksip
+Legacy Internet	Résiliation offre/option Legacy Internet
+Legacy Internet	Souscription offre/option Legacy Internet
+Legacy Fixe	Résiliation offre/option Legacy Fixe
+Legacy Fixe	Souscription offre/option Legacy Fixe
+Connectivity	Souscription Offre Connectivity
+Connectivity	Modification offre Connectivity
+Connectivity	Résiliation Offre Connectivity
+Hebergement/Cloud	Souscription Offre Hébergement/Cloud
+Hebergement/Cloud	Résiliation Offre Hébergement/Cloud
+Aide / renseignement administratif	Renseignement procédure déménagement
+Aide / renseignement administratif	Renseignement procédure cession-reprise contrat
+Aide / renseignement administratif	Renseignement procédure changement nom
+Aide / renseignement administratif	Confirmation présence annuaire
+Aide / renseignement administratif	Demande code Pin/Puk mobile
+Aide / renseignement administratif	Renseignement sur état compte client/offre(s)
+Aide / renseignement administratif	Information sur RDV
+Aide / renseignement administratif	Information sur Monaco Care Mobile
+Aide / renseignement administratif	Renseignement sur procédure de résiliation
+Aide / renseignement administratif	Aide signature électronique
+Acte administratif	Déménagement contrat client
+Acte administratif	Cession-reprise d'un contrat
+Acte administratif	Cession-reprise ligne(s) mobile
+Acte administratif	Changement de nom
+Acte administratif	Modification informations annuaires
+Acte administratif	Suspension/Réactivation ligne mobile
+Acte administratif	Modification de RDV 
+Acte administratif	Activation / Changement eSIM
+Acte administratif	Activation / Changement SIM
+Acte administratif	Ajout/Suppression Mandataire
+Acte administratif	Archivage contrat signé
+Hors périmètre	Hors périmètre
+Opérateur Francais	Orange 
+Opérateur Francais	Bouygues
+Opérateur Francais	Free
+Opérateur Francais	SFR
+Demande relative au règlement de la facture	Information sur solde dû
+Demande relative au règlement de la facture	Demande confirmation réception paiement
+Demande relative au règlement de la facture	Envoi lien de paiement
+Demande relative au règlement de la facture	Modification RIB existant
+Demande relative au règlement de la facture	Changement mode de paiement
+Demande relative au règlement de la facture	Demande de délai paiement / échéancier
+Explication de facture	Explication première facture suite souscription / migration
+Explication de facture	Explication facture de clôture
+Explication de facture	Explication Hors forfait/ Daily Pass
+Explication de facture	Explication de facture autre
+Demande de duplicata de factures	Demande de duplicata de factures
+Réclamation	Réclamation Daily Pass
+Réclamation	Réclamation Autre
+Réclamation	Réclamation Absence de consentement
+Réclamation	Réclamation boutique (comportement/accueil/discours)
+Réclamation	Réclamation non-restitution équipement (sans traces MT)
+Réclamation	Réclamation prestation technicien
+Réclamation	Réclamation qualité produit/ technologie
+Régularisation facture (erreurs /oublis MT)	Régularisation facture (erreurs /oublis MT)
+Campagne Pré-Installation Fibre	Campagne Pré-Installation Fibre
+Création Badge Permanent et/ou Administrateur	
+Création Badge Temporaire	
+Demande Rapport/Listing Accès	
+Modification Droit Accès 	
+Suppression Badge Permanent et/ou Administrateur	
+Accès Opérateur	
+Site Radio	
+Mobile	Activation données en itinérance
+Mobile	AAU Configuration APN
+Mobile	Aide paramétrage messagerie vocale (888/VVM)
+Mobile	Aide à l’utilisation smartphone
+Mobile	AAU Terminal Mobile ou SIM cassé/défectueux
+Mobile	Reboot 
+Mobile	Réinitialisation réglages réseaux
+MTTV	AAU APPLE TV / Reboot / Réinitialisation
+MTTV	AAU Apple TV (source…)
+MTTV	AAU APPLE TV / Mise à jour logiciel
+MTTV	AAU APPLE TV / Navigation télécommande
+MTTV	AAU APPLE TV / Télécommande Cassée/Défectueuse
+MTTV	AAU Apple TV pour appli IPTV (Netflix…)
+MTTV	AAU application MTTV
+MTTV	AAU MTTV accès aux chaînes
+MTTV	AAU MTTV enregistrer un programme / Replay
+MTTV	AAU MTTV guide des programmes
+TV Docsis	Accès aux chaînes - AAU TV (Docsis / SU)
+TV Docsis	Assistance TV (Docsis / SU) (source, branchement)
+TV Docsis	Contrôle du direct - AAU TV (Docsis / SU)
+TV Docsis	Enregistrer un programme - AAU TV (Docsis / SU)
+TV Docsis	Service VOD - AAU TV (Docsis / SU)
+TV Docsis	Guide des programmes - AAU TV (Docsis / SU)
+TV Docsis	Télécommande - AAU TV (Docsis / SU)
+Internet Fibre	AAU Branchements/Jaretières (Box Fibre)
+Internet Fibre	AAU Connexion Wifi (Box Fibre)
+Internet Fibre	AAU Monaco Care Safety
+Internet Fibre	AAU VoIP (Box Fibre)
+Internet Fibre	Aide paramétrage Box Fibre (NAT,DMZ…)
+Internet Fibre	Mise en service Migration - Provisionning
+Internet Docsis	AAU Branchements (Box Docsis)
+Internet Docsis	AAU Connexion Wifi (Box Docsis)
+Internet Docsis	AAU Monaco Care Safety
+Internet Docsis	AAU VoIP (Box Docsis)
+Internet Docsis	Aide paramétrage Box Docsis (NAT,DMZ…)
+Internet Docsis	Mise en service Migration - Provisionning
+Mails	AAU Accès Webmail
+Mails	AAU Config Client messagerie
+Mails	AAU Service messagerie
+MyMT	AAU MyMT
+Trunksip	AAU Trunksip
+Nom de domaine	Modification DNS
+MCR	AAU MCR
+OSM	AAU EVENT
+OSM	AAU FTTY
+OSM	AAU FTTH reseau prive
+OSM	AAU Hébergement
+OSM	AAU IPTV
+OSM	AAU WIFI
+Hébergement	AAU VPS
+Hébergement	AAU IaaS
+Hébergement	AAU Data Center
+Connectivity	AAU Connectivity INTERNET
+Connectivity	AAU Connectivity LAN
+AntiDDOS	AAU AntiDDOS
+Pack Sécurité	AAU Pack Sécurité
+Legacy Internet	AUU Xdsl
+Legacy Fixe	AUU Analogique /T0/ T2
+OCCB	
+IG	
+Rapport	
+Hors périmètre	Hors périmètre
+Opérateur Francais	Orange 
+Opérateur Francais	Bouygues
+Opérateur Francais	Free
+Opérateur Francais	SFR
+Mobile	Echec accroche réseau FR
+Mobile	Echec accroche réseau MC
+Mobile	Echec accroche réseau Roaming (Hors MC & FR)
+Mobile	Echec connexion data FR
+Mobile	Echec connexion data MC
+Mobile	Echec connexion data Roaming (Hors MC & FR)
+Mobile	Echec émission / réception SMS/MMS
+Mobile	Echec émission réception appel FR
+Mobile	Echec émission réception appel MC
+Mobile	Echec émission réception appel Roaming (Hors MC & FR)
+Mobile	Lenteurs data mobile
+Mobile	Problème messagerie vocale mobile (888, VVM)
+Mobile	Qualité appel mobile dégradée
+MTTV	Pb Son et Image MTTV en masse
+MTTV	Pb Accès chaînes MTTV en masse
+MTTV	Pb Lancement Appli MTTV en masse
+MTTV	Pb Fonctionnalités MTTV en masse
+TV Docsis	Pb Son et Image TV Docsis en masse
+TV Docsis	Pb Accès chaînes TV Docsis en masse
+TV Docsis	Pb Fonctionnalités TV Docsis en masse
+Internet Fibre	Pb Accès Internet en masse (Box Fibre)
+Internet Fibre	Pb VOIP en masse (Box Fibre)
+Internet Fibre	Pb WIFI en masse (Box Fibre)
+Internet Fibre	Pb Alimentation
+Internet Docsis	Pb Accès Internet en masse (Box Docsis)
+Internet Docsis	Pb VOIP en masse (Box Docsis)
+Internet Docsis	Pb WIFI en masse (Box Docsis)
+Mails	Accès mails KO en masse
+Mails	Emission/réception mails KO en masse
+Mails	Webmail KO en masse
+MyMT	Accès MyMT impossible en masse
+MyMT	Fonctionnalité(s) MyMT KO en masse
+MyMT	Lenteurs MyMT (accès ou navigation) en masse
+Trunksip	Emission/Réception appels impossible
+Trunksip	Problème d'enregistrement technique
+Trunksip	Problème audio
+Nom de domaine	Service DNS KO
+MCR	Accès au portail KO
+MCR	Pas d'appels enregistré
+MCR	Pas de SMS enregistré
+OSM	WIFI
+OSM	IPTV
+OSM	FFTY
+OSM	EVENT
+OSM	Hébergement
+OSM	FTTH Reseau Prive
+Hébergement	VPS
+Hébergement	IaaS
+Hébergement	Data Center
+Connectivity	Connectivity INTERNET
+Connectivity	Connectivity LAN
+AntiDDOS	AntiDDOS
+Pack Sécurité	Pack Sécurité
+Legacy Internet	Xdsl
+Legacy Fixe	Analogique /T0/ T2
+Pro actif Connectivity	
+Pro actif Hébergement	
+Pro actif Fraude Téléphonie	
+Mobile	Echec accroche réseau FR
+Mobile	Echec accroche réseau MC
+Mobile	Echec accroche réseau Roaming (Hors MC & FR)
+Mobile	Echec connexion data FR
+Mobile	Echec connexion data MC
+Mobile	Echec connexion data Roaming (Hors MC & FR)
+Mobile	Echec émission / réception SMS/MMS
+Mobile	Echec émission réception appel FR
+Mobile	Echec émission réception appel MC
+Mobile	Echec émission réception appel Roaming (Hors MC & FR)
+Mobile	Lenteurs data mobile
+Mobile	PB Qualité appel mobile dégradée MC
+Mobile	Problème messagerie vocale mobile (888, VVM)
+MTTV	ACCES CHAINES MTTV /-  pb sur un pack de chaînes
+MTTV	ACCES CHAINES MTTV /- pb sur plusieurs chaînes
+MTTV	ACCES CHAINES MTTV /- pb sur une chaîne
+MTTV	APPLE TV / Perte de la connexion Wifi
+MTTV	LANCEMENT APPLI MTTV/- Impossible
+MTTV	LANCEMENT APPLI MTTV/- ZSO KO
+MTTV	PB Enregistrement/Replay MTTV 
+MTTV	PB SON ET IMAGE MTTV /- Image et/ou son dégradés
+MTTV	PB SON ET IMAGE MTTV /- Pas d'image et/ou son
+MTTV	Sous-titrage / audio description / VO
+MTTV	TELECOMMANDE APPLE TV /- pb d'appairage
+TV Docsis	ACCES CHAINES TV (Docsis/SU) /-  pb sur un pack de chaînes
+TV Docsis	ACCES CHAINES TV (Docsis/SU) /- pb sur plusieurs chaînes
+TV Docsis	ACCES CHAINES TV (Docsis/SU) /- pb sur une chaîne
+TV Docsis	Enregistrement TV (Docsis/SU) dégradé
+TV Docsis	Enregistrement TV (Docsis/SU) impossible / Pb permanent
+TV Docsis	Enregistrement TV (Docsis/SU) impossible / Pb unitaire
+TV Docsis	Guide des programmes défectueux TV (Docsis/SU)
+TV Docsis	Pb de contrôle du direct TV (Docsis/SU)
+TV Docsis	PB SON ET IMAGE TV (Docsis/SU) /-  Image et son dégradés
+TV Docsis	PB SON ET IMAGE TV (Docsis/SU) /- Image dégradée
+TV Docsis	PB SON ET IMAGE TV (Docsis/SU) /- Pas d'image
+TV Docsis	PB SON ET IMAGE TV (Docsis/SU) /- Pas de son
+TV Docsis	PB SON ET IMAGE TV (Docsis/SU) /- Pas de son et image
+TV Docsis	PB SON ET IMAGE TV (Docsis/SU) /- Son dégradé
+TV Docsis	Sous-titrage / audio description / VO
+TV Docsis	TELECOMMANDE / Pb apparairage  TV (Docsis/SU)
+TV Docsis	TELECOMMANDE / Pb de fonctionnement TV (Docsis/SU)
+TV Docsis	VOD service défectueux
+Internet Fibre	ACCES INTERNET / indisponible (Box fibre)
+Internet Fibre	ACCES INTERNET / intermittent (Box fibre)
+Internet Fibre	ETHERNET / Connexion impossible (Box Fibre)
+Internet Fibre	ETHERNET / Connexion lente/dégradée (Box Fibre)
+Internet Fibre	VOIP / Emission/Qualité Appel dégradée (Box Fibre)
+Internet Fibre	VOIP / Emission/Réception impossible (Box Fibre)
+Internet Fibre	VOIP / Pb Messagerie Vocale (Box Fibre)
+Internet Fibre	WIFI / Connexion impossible (Box Fibre)
+Internet Fibre	WIFI / Connexion lente/dégradée (Box Fibre)
+Internet Fibre	WIFI / Pb Mesh (Box Fibre)
+Internet Docsis	ACCES INTERNET / indisponible (Box Docsis)
+Internet Docsis	ACCES INTERNET / intermittent (Box Docsis)
+Internet Docsis	ACCES INTERNET / lent/dégradé (Box Docsis)
+Internet Docsis	ETHERNET / Connexion impossible (Box Docsis)
+Internet Docsis	ETHERNET / Connexion lente/dégradée (Box Docsis)
+Internet Docsis	VOIP / Emission/Qualité Appel dégradée (Box Docsis)
+Internet Docsis	VOIP / Emission/Réception impossible (Box Docsis)
+Internet Docsis	VOIP /Pb Messagerie Vocale (Box Docsis)
+Internet Docsis	WIFI / Connexion impossible (Box Docsis)
+Internet Docsis	WIFI / Connexion lente/dégradée (Box Docsis)
+Internet Docsis	WIFI / Pb de couverture (Box Docsis)
+Mails	Pb de spam
+Mails	Accès webmail KO
+Mails	Emission/réception mails KO
+MyMT	Accès MyMT impossible
+MyMT	Fonctionnalité(s) MyMT KO
+MyMT	Lenteurs MyMT (accès ou navigation)
+Trunksip	Emission/Réception appels impossible
+Trunksip	Ko suite Migration
+Trunksip	Non présentation des numéros
+Trunksip	Problème audio
+Trunksip	Problème d'enregistrement technique
+Nom de domaine	Service DNS KO
+MCR	Accès au portail KO
+MCR	Pas d'appels enregistré
+MCR	Pas de SMS enregistré
+MCR	Problème de clé de sécurité
+OSM	EVENT
+OSM	FTTY
+OSM	FTTH Reseau Prive
+OSM	Hébergement
+OSM	IPTV
+OSM	WIFI
+Hébergement	VPS
+Hébergement	IaaS
+Hébergement	Data Center
+Legacy Fixe	Analogique / T0 / T2
+Connectivity	LAN
+Connectivity	Internet
+AntiDDOS	AntiDDOS
+Pack Sécurité	Pack Sécurité
+Legacy Internet	Xdsl
+Fsecure	Création initiale
+Fsecure	Assistance après mise en service 
+Internet Docsis	Création initiale
+Internet Docsis	Assistance après mise en service 
+Internet Fibre	Création initiale
+Internet Fibre	Assistance après mise en service 
+NDD	Création initiale
+NDD	Assistance après mise en service 
+SSL	Création initiale
+SSL	Assistance après mise en service 
+Trunksip/Teams	Création initiale
+Trunksip/Teams	Assistance après mise en service 
+Apple TV	Aide à l'usage
+Apple TV	Echange Apple TV
+Apple TV	Echange divers
+Apple TV	Echange Telecommande
+Apple TV	Test Apple TV
+Apple TV	Test Telecommande
+Cuivre	Echange Box
+Cuivre	Test box
+Denver	Echange Box
+Denver	Echange Telecommande
+Denver	Test box
+Denver	Test Telecommande
+DOCSIS	Echange Box
+DOCSIS	Echange divers
+DOCSIS	Echange Telecommande
+DOCSIS	Test box
+DOCSIS	Test Telecommande
+Fibre	Echange Box
+Fibre	Echange divers
+Fibre	Echange Mesh
+Fibre	Echange Telecommande
+Fibre	Test box
+Fibre	Test Telecommande
+Mobile	Aise à l'usage
+Mobile	Changement SIM
+Mobile	Monaco Care Mobile
+Mobile	Prêt de mobile
+Mobile	Transfert de données Mobile

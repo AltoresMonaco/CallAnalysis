@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # Default CPU-optimized service (your current setup, enhanced)
+  audio-altores:
+    build: .
+    container_name: ai-call-analysis
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - USE_GPU=false  # Explicit CPU mode
+      - MAX_WORKERS=${MAX_WORKERS:-4}
+    volumes:
+      - ./prompts:/app/prompts:ro
+      - /tmp/audio_processing:/tmp/audio_processing
+      - app_settings:/app/settings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # GPU-accelerated service (only starts with --profile gpu)
+  audio-altores-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+      args:
+        BUILD_TARGET: production
+    container_name: audio-transcription-api-gpu
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - USE_GPU=true
+      - MAX_WORKERS=${MAX_WORKERS:-20}
+      - MEMORY_LIMIT_GB=${MEMORY_LIMIT_GB:-32}
+    volumes:
+      - ./prompts:/app/prompts:ro
+      - /tmp/audio_processing:/tmp/audio_processing
+      - app_settings:/app/settings
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Auto-detect service (starts with --profile auto)
+  audio-altores-auto:
+    profiles: ["auto"]
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+      args:
+        BUILD_TARGET: development
+    container_name: audio-transcription-api-auto
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - USE_GPU=auto  # Auto-detect and fallback
+      - MAX_WORKERS=${MAX_WORKERS:-8}
+    volumes:
+      - ./prompts:/app/prompts:ro
+      - /tmp/audio_processing:/tmp/audio_processing
+      - app_settings:/app/settings
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Professional IDE - VS Code in browser
+  code-server:
+    image: codercom/code-server:latest
+    container_name: audio-transcript-ide
+    ports:
+      - "8080:8080"
+    environment:
+      - PASSWORD=transcript-dev
+    volumes:
+      - .:/home/coder/project
+      - code_server_data:/home/coder/.local
+    working_dir: /home/coder/project
+    user: "1000:1000"
+    restart: unless-stopped
+    command: >
+      --bind-addr 0.0.0.0:8080
+      --disable-telemetry
+      --disable-update-check
+
+volumes:
+  app_settings:
+    driver: local
+  code_server_data:
+    driver: local 
