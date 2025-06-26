@@ -1,0 +1,20 @@
+[Unit]
+Description=Ollama Model Warmer - Keep lucifers/Polaris-4B-Preview.Q8_0 cached
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/workspace/opt/apps/transcript
+ExecStart=/workspace/opt/apps/transcript/keep_model_warm.sh
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables for Ollama
+Environment=OLLAMA_HOST=localhost:11434
+
+[Install]
+WantedBy=multi-user.target 

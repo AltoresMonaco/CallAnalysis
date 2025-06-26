@@ -1,0 +1,2151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCI</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/sidebar.css?v=2.0" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/utils.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1rem;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 0.75rem 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            height: 40px;
+            width: auto;
+        }
+
+        .page-title {
+            color: #273BEF;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            background: #273BEF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: #1e2fcf;
+            transform: translateY(-1px);
+        }
+
+        .btn.secondary {
+            background: white;
+            color: #273BEF;
+            border: 1px solid #273BEF;
+        }
+
+        .btn.secondary:hover {
+            background: #e8e7ff;
+        }
+
+        /* Filters Section */
+        .filters-section {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            color: #273BEF;
+            font-size: 0.85rem;
+        }
+
+        .filter-input {
+            border: 1px solid #dee2e9;
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            font-family: inherit;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #273BEF;
+            box-shadow: 0 0 0 3px rgba(39, 59, 239, 0.1);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stats-metrics-wrapper {
+            width: 22vw;
+            max-width: 320px;
+            min-width: 200px;
+            margin: 0;
+            flex-shrink: 0;
+        }
+        @media (max-width: 900px) {
+            .stats-metrics-wrapper {
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+        .stats-category-card {
+            width: 100%;
+        }
+        .stats-metrics-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .stats-category-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+            transition: transform 0.3s ease;
+        }
+
+        .stats-category-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stats-category-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .stats-category-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            color: white;
+        }
+
+        .stats-category-icon.primary {
+            background: linear-gradient(135deg, #273BEF 0%, #1e2fcf 100%);
+        }
+
+        .stats-category-icon.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .stats-category-icon.warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+
+        .stats-category-icon.danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .stats-category-icon.info {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+
+        .stats-category-title {
+            color: #273BEF;
+            font-weight: 600;
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        .stat-metric {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.7rem;
+            background: #f8f9fa;
+            border-radius: 7px;
+            border: 1px solid #e9ecef;
+            min-height: 32px;
+        }
+
+        .stat-metric-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .stat-metric-icon.primary {
+            background: linear-gradient(135deg, #273BEF 0%, #1e2fcf 100%);
+        }
+
+        .stat-metric-icon.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .stat-metric-icon.warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+
+        .stat-metric-icon.danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .stat-metric-icon.info {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+
+        .stat-metric-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .stat-metric-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+            line-height: 1.1;
+        }
+
+        .stat-metric-label {
+            color: #6b7280;
+            font-size: 0.7rem;
+            font-weight: 500;
+            line-height: 1.1;
+        }
+
+        .stat-metric-change {
+            font-size: 0.625rem;
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }
+
+        .stat-metric-change.positive {
+            color: #10b981;
+        }
+
+        .stat-metric-change.negative {
+            color: #ef4444;
+        }
+
+        /* Category Breadcrumb */
+        .category-breadcrumb {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+        }
+
+        .breadcrumb-title {
+            color: #273BEF;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .breadcrumb-levels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .breadcrumb-level {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .level-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .level-select {
+            border: 1px solid #dee2e9;
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            font-family: inherit;
+            min-width: 150px;
+            background: white;
+        }
+
+        .level-select:focus {
+            outline: none;
+            border-color: #273BEF;
+            box-shadow: 0 0 0 3px rgba(39, 59, 239, 0.1);
+        }
+
+        .breadcrumb-separator {
+            display: flex;
+            align-items: center;
+            color: #6b7280;
+            font-size: 0.75rem;
+            margin: 0 0.25rem;
+        }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.1rem 1.2rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .chart-title {
+            color: #273BEF;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .stats-metrics-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .stat-metric {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.5rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            min-height: 24px;
+        }
+
+        .stat-metric-icon {
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .stat-metric-value {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: #1f2937;
+            line-height: 1.1;
+        }
+
+        .stat-metric-label {
+            color: #6b7280;
+            font-size: 0.62rem;
+            font-weight: 500;
+            line-height: 1.1;
+        }
+
+        /* Insights Section */
+        .insights-section {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+        }
+
+        .insights-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .insights-title {
+            color: #273BEF;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .insight-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            border-left: 4px solid #273BEF;
+        }
+
+        .insight-title {
+            font-weight: 600;
+            color: #273BEF;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .insight-content {
+            font-size: 0.85rem;
+            color: #374151;
+            line-height: 1.4;
+        }
+
+        /* Keyword Cloud */
+        .keyword-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .keyword-tag {
+            background: #e8e7ff;
+            color: #273BEF;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .keyword-tag.frequent {
+            background: #273BEF;
+            color: white;
+        }
+
+        /* Data Table */
+        .data-section {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+        }
+
+        .data-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .data-title {
+            color: #273BEF;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            color: #273BEF;
+            border-bottom: 2px solid #dee2e9;
+        }
+
+        .data-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #dee2e9;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-badge.completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-badge.in_progress {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .sentiment-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .sentiment-badge.positive {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .sentiment-badge.negative {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .sentiment-badge.neutral {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        /* Loading and States */
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #6b7280;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #dee2e9;
+            border-top: 3px solid #273BEF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #ef4444;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-metric {
+                padding: 0.5rem;
+            }
+            
+            .stat-metric-value {
+                font-size: 1rem;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .data-table {
+                font-size: 0.75rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.5rem;
+            }
+        }
+
+        /* Collapsible Sections */
+        .collapsible-section {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+            overflow: hidden;
+            transition: margin-bottom 0.2s;
+        }
+        .collapsible-section.collapsed {
+            margin-bottom: 0.3rem;
+        }
+        .collapsible-header {
+            background: #f8f9fa;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #dee2e9;
+            transition: background-color 0.3s ease, padding 0.2s;
+            min-height: 32px;
+        }
+        .collapsible-header:hover {
+            background: #e8e7ff;
+        }
+        .collapsible-title {
+            color: #273BEF;
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .collapsible-icon {
+            color: #273BEF;
+            transition: transform 0.3s ease;
+        }
+        .collapsible-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        .collapsible-content {
+            padding: 1rem 1.5rem;
+            transition: all 0.3s ease;
+            max-height: 1000px;
+            opacity: 1;
+        }
+        .collapsible-content.collapsed {
+            max-height: 0;
+            padding: 0 !important;
+            margin: 0 !important;
+            min-height: 0 !important;
+            border: none !important;
+            opacity: 0;
+            overflow: hidden;
+        }
+        /* Make sure the header bar is always visible and clickable */
+        .collapsible-header {
+            user-select: none;
+        }
+        /* Responsive: tighter on mobile */
+        @media (max-width: 900px) {
+            .collapsible-header {
+                padding: 0.4rem 0.7rem;
+                min-height: 28px;
+            }
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .quick-action-btn {
+            background: white;
+            border: 1px solid #dee2e9;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: #273BEF;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .quick-action-btn:hover {
+            background: #e8e7ff;
+            border-color: #273BEF;
+        }
+
+        .quick-action-btn.active {
+            background: #273BEF;
+            color: white;
+        }
+
+        /* --- Dashboard Flex Layout --- */
+        #dashboardContent {
+            display: block;
+        }
+        @media (max-width: 900px) {
+            #dashboardContent {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <img src="/static/logo.png" alt="Logo" class="logo">
+                <h1 class="page-title">
+                    <i class="fas fa-chart-line"></i> Customer Care Intelligence Dashboard
+                </h1>
+            </div>
+            <div class="header-actions">
+                <a href="/upload" class="btn secondary">
+                    <i class="fas fa-upload"></i> Upload Audio
+                </a>
+                <button class="btn secondary" onclick="refreshData()">
+                    <i class="fas fa-refresh"></i> Refresh
+                </button>
+                <button class="btn" onclick="exportData()">
+                    <i class="fas fa-download"></i> Export Report
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <button class="quick-action-btn" onclick="toggleSection('filtersSection')">
+                <i class="fas fa-filter"></i> Filters
+            </button>
+            <button class="quick-action-btn" onclick="toggleSection('categorySection')">
+                <i class="fas fa-sitemap"></i> Categories
+            </button>
+            <button class="quick-action-btn" onclick="expandAllSections()">
+                <i class="fas fa-expand"></i> Expand All
+            </button>
+            <button class="quick-action-btn" onclick="collapseAllSections()">
+                <i class="fas fa-compress"></i> Collapse All
+            </button>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="collapsible-section" id="filtersSection">
+            <div class="collapsible-header" onclick="toggleSection('filtersSection')">
+                <div class="collapsible-title">
+                    <i class="fas fa-filter"></i> Basic Filters
+                </div>
+                <i class="fas fa-chevron-down collapsible-icon" id="filtersIcon"></i>
+            </div>
+            <div class="collapsible-content" id="filtersContent">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">Date Range</label>
+                        <select class="filter-input" id="dateRange" onchange="applyFilters()">
+                            <option value="7">Last 7 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="all">All time</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Sentiment</label>
+                        <select class="filter-input" id="sentimentFilter" onchange="applyFilters()">
+                            <option value="all">All Sentiments</option>
+                            <option value="positive">Positive</option>
+                            <option value="negative">Negative</option>
+                            <option value="neutral">Neutral</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Search</label>
+                        <input type="text" class="filter-input" id="searchFilter" placeholder="Search keywords, issues..." onkeyup="applyFilters()">
+                    </div>
+                    <div class="filter-group">
+                        <button class="btn" onclick="applyFilters()">
+                            <i class="fas fa-filter"></i> Apply Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Breadcrumb Section -->
+        <div class="collapsible-section" id="categorySection">
+            <div class="collapsible-header" onclick="toggleSection('categorySection')">
+                <div class="collapsible-title">
+                    <i class="fas fa-sitemap"></i> Category Hierarchy Filter
+                </div>
+                <i class="fas fa-chevron-down collapsible-icon" id="categoryIcon"></i>
+            </div>
+            <div class="collapsible-content" id="categoryContent">
+                <div class="breadcrumb-levels">
+                    <div class="breadcrumb-level">
+                        <div class="level-label">Type Typologie</div>
+                        <select class="level-select" id="categoryLevel1" onchange="updateCategoryLevels(1)">
+                            <option value="all">All Categories</option>
+                        </select>
+                    </div>
+                    <div class="breadcrumb-separator">
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="breadcrumb-level">
+                        <div class="level-label">Type Incident</div>
+                        <select class="level-select" id="categoryLevel2" onchange="updateCategoryLevels(2)" disabled>
+                            <option value="all">Select Type Typologie first</option>
+                        </select>
+                    </div>
+                    <div class="breadcrumb-separator">
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="breadcrumb-level">
+                        <div class="level-label">Cat. Op. 1</div>
+                        <select class="level-select" id="categoryLevel3" onchange="updateCategoryLevels(3)" disabled>
+                            <option value="all">Select Type Incident first</option>
+                        </select>
+                    </div>
+                    <div class="breadcrumb-separator">
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="breadcrumb-level">
+                        <div class="level-label">Cat. Op. 2</div>
+                        <select class="level-select" id="categoryLevel4" onchange="updateCategoryLevels(4)" disabled>
+                            <option value="all">Select Cat. Op. 1 first</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading customer care intelligence data...</p>
+        </div>
+
+        <div class="error-state" id="errorState" style="display: none;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+            <h3>Error Loading Data</h3>
+            <p id="errorMessage">Failed to load customer care intelligence data.</p>
+        </div>
+
+        <div id="dashboardContent" style="display: none;">
+            <div class="charts-grid">
+                <div id="metricsChartCard" class="chart-card"></div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Customer Sentiment Distribution</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="sentimentChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Top Customer Issues</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="issuesChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Call Volume & Sentiment Trend</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Service Categories</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="categoriesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights Section -->
+            <div class="insights-section">
+                <div class="insights-header">
+                    <h3 class="insights-title">Key Insights & Trends</h3>
+                </div>
+                <div class="insights-grid" id="insightsGrid">
+                    <!-- Dynamic insights will be generated here -->
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="data-section">
+                <div class="data-header">
+                    <h3 class="data-title">Customer Interaction Details</h3>
+                    <div>
+                        <span id="resultsCount">0 interactions</span>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer Issue</th>
+                                <th>Sentiment</th>
+                                <th>Keywords</th>
+                                <th>Category</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                            <!-- Dynamic table rows will be generated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allResults = [];
+        let filteredResults = [];
+        let charts = {};
+
+        // Load data on page load
+        window.addEventListener('load', function() {
+            // Initialize the modern sidebar
+            if (window.Sidebar) {
+                Sidebar.init();
+            }
+            loadReportingData();
+            
+            // Add search input event listener with debouncing
+            const searchInput = document.getElementById('searchFilter');
+            let searchTimeout;
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    console.log('[Search] Input changed, applying filters...');
+                    applyFilters();
+                }, 300); // 300ms delay
+            });
+            
+            // Initialize sections as collapsed by default
+            collapseAllSections();
+        });
+
+        async function loadReportingData() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('errorState').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'none';
+                
+                const response = await API.get('/api/saved-results');
+                allResults = response.results || [];
+                filteredResults = response.results || [];
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+                
+                populateCategoryFilter();
+                renderDashboard();
+                
+            } catch (error) {
+                console.error('Error loading reporting data:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('errorState').style.display = 'block';
+                document.getElementById('errorMessage').textContent = error.message || 'Failed to load reporting data';
+            }
+        }
+
+        function refreshData() {
+            loadReportingData();
+        }
+
+        function populateCategoryFilter() {
+            // Extract all categories from results and build hierarchy
+            const categoryHierarchy = buildCategoryHierarchy();
+            
+            // Populate Level 1
+            const level1Select = document.getElementById('categoryLevel1');
+            level1Select.innerHTML = '<option value="all">All Categories</option>';
+            
+            Object.keys(categoryHierarchy).sort().forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                level1Select.appendChild(option);
+            });
+        }
+
+        function buildCategoryHierarchy() {
+            const hierarchy = {};
+            
+            allResults.forEach(result => {
+                if (result.results?.categorisation?.response) {
+                    let categoryData;
+                    
+                    // Try to parse as JSON first
+                    try {
+                        categoryData = typeof result.results.categorisation.response === 'string' 
+                            ? JSON.parse(result.results.categorisation.response)
+                            : result.results.categorisation.response;
+                    } catch (e) {
+                        // If not JSON, try to parse as comma-separated string (fallback)
+                        const categoryText = result.results.categorisation.response;
+                        const categoryList = categoryText.split(',').map(cat => cat.trim());
+                        categoryList.forEach(category => {
+                            if (category && category !== 'N/A' && category !== '') {
+                                const levels = category.split('>').map(level => level.trim());
+                                buildHierarchyFromLevels(hierarchy, levels);
+                            }
+                        });
+                        return;
+                    }
+                    
+                    // Build hierarchy from structured category data
+                    const levels = [
+                        categoryData.type_typologie,
+                        categoryData.type_incident,
+                        categoryData.categorie_operationnelle_1,
+                        categoryData.categorie_operationnelle_2,
+                        categoryData.categorie_operationnelle_3
+                    ].filter(level => level && level !== 'N/A' && level !== '');
+                    
+                    buildHierarchyFromLevels(hierarchy, levels);
+                }
+            });
+            
+            return hierarchy;
+        }
+
+        function buildHierarchyFromLevels(hierarchy, levels) {
+            let currentLevel = hierarchy;
+            levels.forEach((level, index) => {
+                if (!currentLevel[level]) {
+                    currentLevel[level] = {
+                        count: 0,
+                        children: {}
+                    };
+                }
+                currentLevel[level].count++;
+                if (index < levels.length - 1) {
+                    currentLevel = currentLevel[level].children;
+                }
+            });
+        }
+
+        function updateCategoryLevels(level) {
+            const hierarchy = buildCategoryHierarchy();
+            const selectedLevels = getSelectedCategoryLevels();
+            
+            // Reset all levels after the current one
+            for (let i = level + 1; i <= 4; i++) {
+                const select = document.getElementById(`categoryLevel${i}`);
+                select.innerHTML = `<option value="all">Select ${getLevelLabel(i-1)} first</option>`;
+                select.disabled = true;
+            }
+            
+            // Enable and populate the next level if a selection was made
+            if (level < 4 && selectedLevels[level] && selectedLevels[level] !== 'all') {
+                const nextLevel = level + 1;
+                const nextSelect = document.getElementById(`categoryLevel${nextLevel}`);
+                nextSelect.disabled = false;
+                nextSelect.innerHTML = '<option value="all">All Subcategories</option>';
+                
+                // Find the children of the selected level
+                let currentLevel = hierarchy;
+                for (let i = 1; i <= level; i++) {
+                    if (currentLevel[selectedLevels[i]]) {
+                        currentLevel = currentLevel[selectedLevels[i]].children;
+                    } else {
+                        break;
+                    }
+                }
+                
+                // Populate next level options
+                Object.keys(currentLevel).sort().forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = `${category} (${currentLevel[category].count})`;
+                    nextSelect.appendChild(option);
+                });
+            }
+            
+            // Apply filters
+            applyFilters();
+        }
+
+        function getLevelLabel(level) {
+            const labels = {
+                1: 'Type Typologie',
+                2: 'Type Incident', 
+                3: 'Cat. Op. 1',
+                4: 'Cat. Op. 2'
+            };
+            return labels[level] || `Level ${level}`;
+        }
+
+        function getSelectedCategoryLevels() {
+            const levels = {};
+            for (let i = 1; i <= 4; i++) {
+                const select = document.getElementById(`categoryLevel${i}`);
+                levels[i] = select.value;
+            }
+            return levels;
+        }
+
+        function applyFilters() {
+            const dateRange = document.getElementById('dateRange').value;
+            const sentimentFilter = document.getElementById('sentimentFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+            const selectedLevels = getSelectedCategoryLevels();
+
+            let filtered = allResults;
+
+            // Apply date filter
+            if (dateRange !== 'all') {
+                const daysAgo = new Date();
+                daysAgo.setDate(daysAgo.getDate() - parseInt(dateRange));
+                filtered = filtered.filter(result => new Date(result.completed_at) >= daysAgo);
+            }
+
+            // Apply sentiment filter
+            if (sentimentFilter !== 'all') {
+                filtered = filtered.filter(result => {
+                    const sentiment = getSentiment(result);
+                    return sentiment === sentimentFilter;
+                });
+            }
+
+            // Apply hierarchical category filter
+            const hasCategoryFilter = Object.values(selectedLevels).some(level => level !== 'all');
+            if (hasCategoryFilter) {
+                filtered = filtered.filter(result => {
+                    if (!result.results?.categorisation?.response) {
+                        return false;
+                    }
+                    
+                    let categoryData;
+                    try {
+                        categoryData = typeof result.results.categorisation.response === 'string' 
+                            ? JSON.parse(result.results.categorisation.response)
+                            : result.results.categorisation.response;
+                    } catch (e) {
+                        // Fallback to string parsing for old format
+                        const categoryText = result.results.categorisation.response;
+                        const categoryList = categoryText.split(',').map(cat => cat.trim());
+                        
+                        return categoryList.some(category => {
+                            if (!category || category === 'N/A' || category === '') {
+                                return false;
+                            }
+                            
+                            const levels = category.split('>').map(level => level.trim());
+                            
+                            // Check if this category matches the selected hierarchy
+                            for (let i = 1; i <= 4; i++) {
+                                if (selectedLevels[i] === 'all') {
+                                    continue;
+                                }
+                                
+                                if (i > levels.length || levels[i - 1] !== selectedLevels[i]) {
+                                    return false;
+                                }
+                            }
+                            
+                            return true;
+                        });
+                    }
+                    
+                    // Check structured category data against selected levels
+                    const categoryLevels = [
+                        categoryData.type_typologie,
+                        categoryData.type_incident,
+                        categoryData.categorie_operationnelle_1,
+                        categoryData.categorie_operationnelle_2,
+                        categoryData.categorie_operationnelle_3
+                    ];
+                    
+                    for (let i = 1; i <= 4; i++) {
+                        if (selectedLevels[i] === 'all') {
+                            continue;
+                        }
+                        
+                        if (i > categoryLevels.length || categoryLevels[i - 1] !== selectedLevels[i]) {
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                });
+            }
+
+            // Apply search filter
+            if (searchFilter) {
+                console.log('[Search] Searching for:', searchFilter);
+                filtered = filtered.filter(result => {
+                    try {
+                        const keywords = result.results?.keywords?.keywords || [];
+                        const issues = result.results?.issues?.issues || [];
+                        const summary = result.results?.summary?.summary || '';
+                        const transcript = result.results?.transcript || '';
+                        
+                        console.log('[Search] Checking result:', result.filename);
+                        console.log('[Search] Keywords:', keywords);
+                        console.log('[Search] Issues:', issues);
+                        console.log('[Search] Summary length:', summary.length);
+                        
+                        // Check filename and task_id
+                        const filenameMatch = result.filename.toLowerCase().includes(searchFilter);
+                        const taskIdMatch = result.task_id.toLowerCase().includes(searchFilter);
+                        
+                        // Check keywords
+                        const keywordMatch = keywords.some(k => 
+                            k && typeof k === 'string' && k.toLowerCase().includes(searchFilter)
+                        );
+                        
+                        // Check issues
+                        const issueMatch = issues.some(i => 
+                            (i.keyword && typeof i.keyword === 'string' && i.keyword.toLowerCase().includes(searchFilter)) ||
+                            (i.description && typeof i.description === 'string' && i.description.toLowerCase().includes(searchFilter))
+                        );
+                        
+                        // Check summary and transcript
+                        const summaryMatch = summary && typeof summary === 'string' && summary.toLowerCase().includes(searchFilter);
+                        const transcriptMatch = transcript && typeof transcript === 'string' && transcript.toLowerCase().includes(searchFilter);
+                        
+                        const matches = filenameMatch || taskIdMatch || keywordMatch || issueMatch || summaryMatch || transcriptMatch;
+                        
+                        console.log('[Search] Matches:', {
+                            filename: filenameMatch,
+                            taskId: taskIdMatch,
+                            keyword: keywordMatch,
+                            issue: issueMatch,
+                            summary: summaryMatch,
+                            transcript: transcriptMatch,
+                            total: matches
+                        });
+                        
+                        return matches;
+                    } catch (error) {
+                        console.error('[Search] Error processing result:', error, result);
+                        return false;
+                    }
+                });
+                console.log('[Search] Filtered results count:', filtered.length);
+            }
+
+            filteredResults = filtered;
+            renderDashboard();
+        }
+
+        function getSentiment(result) {
+            // Only use results.summary.isPositive (no question mark)
+            if (result.results && result.results.summary && typeof result.results.summary.isPositive === 'boolean') {
+                return result.results.summary.isPositive ? 'positive' : 'negative';
+            }
+            return 'neutral';
+        }
+
+        function renderDashboard() {
+            renderStats();
+            renderCharts();
+            renderInsights();
+            renderDataTable();
+        }
+
+        function renderStats() {
+            const stats = calculateStats();
+            const metricsChartCard = document.getElementById('metricsChartCard');
+
+            // Boolean mappings (label, icon class)
+            const booleanMappings = {
+                technicianVisitedCustomer: {
+                    label: 'Technician Visit',
+                    icon: '<i class="fas fa-tools"></i>',
+                    color: 'info'
+                },
+                hasVisitedShop: {
+                    label: 'Visited Shop',
+                    icon: '<i class="fas fa-store"></i>',
+                    color: 'primary'
+                },
+                previousCalls: {
+                    label: 'Previous Calls',
+                    icon: '<i class="fas fa-history"></i>',
+                    color: 'warning'
+                }
+            };
+
+            // Collect boolean counts for mapped fields only
+            const booleanCounts = {};
+            filteredResults.forEach(result => {
+                const summary = result.results && result.results.summary;
+                if (summary && typeof summary === 'object') {
+                    Object.keys(booleanMappings).forEach(key => {
+                        if (typeof summary[key] === 'boolean') {
+                            if (!booleanCounts[key]) booleanCounts[key] = { true: 0, false: 0 };
+                            booleanCounts[key][summary[key] ? 'true' : 'false']++;
+                        }
+                    });
+                }
+            });
+            const total = filteredResults.length;
+
+            // Render metrics
+            let metricsHTML = `
+                <div class="stat-metric">
+                    <div class="stat-metric-icon primary">
+                        <i class="fas fa-phone"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value">${stats.totalCalls}</div>
+                        <div class="stat-metric-label">Total Calls</div>
+                    </div>
+                </div>
+                <div class="stat-metric">
+                    <div class="stat-metric-icon success">
+                        <i class="fas fa-smile"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value">${stats.positiveSentiment}%</div>
+                        <div class="stat-metric-label">Positive Sentiment</div>
+                    </div>
+                </div>
+                <div class="stat-metric">
+                    <div class="stat-metric-icon success">
+                        <i class="fas fa-arrow-up"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value stat-metric-change positive">${stats.positiveCalls} calls</div>
+                        <div class="stat-metric-label">Positive Calls</div>
+                    </div>
+                </div>
+                <div class="stat-metric">
+                    <div class="stat-metric-icon warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value">${stats.uniqueIssues}</div>
+                        <div class="stat-metric-label">Issues</div>
+                    </div>
+                </div>
+                <div class="stat-metric">
+                    <div class="stat-metric-icon info">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value">${stats.avgDuration} min</div>
+                        <div class="stat-metric-label">Average Duration</div>
+                    </div>
+                </div>
+                <div class="stat-metric">
+                    <div class="stat-metric-icon danger">
+                        <i class="fas fa-frown"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value">${stats.negativeSentiment}%</div>
+                        <div class="stat-metric-label">Negative Sentiment</div>
+                    </div>
+                </div>
+                <div class="stat-metric">
+                    <div class="stat-metric-icon danger">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value stat-metric-change negative">${stats.negativeCalls} calls</div>
+                        <div class="stat-metric-label">Negative Calls</div>
+                    </div>
+                </div>
+                <div class="stat-metric">
+                    <div class="stat-metric-icon primary">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                    <div class="stat-metric-content">
+                        <div class="stat-metric-value">${stats.topKeywords.length}</div>
+                        <div class="stat-metric-label">Keywords</div>
+                    </div>
+                </div>
+            `;
+
+            // Add mapped boolean metrics (skip isPositive)
+            Object.entries(booleanMappings).forEach(([key, {label, icon, color}]) => {
+                if (booleanCounts[key]) {
+                    const trueCount = booleanCounts[key].true || 0;
+                    const percentTrue = total > 0 ? Math.round((trueCount / total) * 100) : 0;
+                    metricsHTML += `
+                        <div class="stat-metric">
+                            <div class="stat-metric-icon ${color}">${icon}</div>
+                            <div class="stat-metric-content">
+                                <div class="stat-metric-value">${percentTrue}%</div>
+                                <div class="stat-metric-label">${label}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            metricsChartCard.innerHTML = `
+                <div class="stats-metrics-grid">
+                    ${metricsHTML}
+                </div>
+            `;
+        }
+
+        function calculateStats() {
+            const totalCalls = filteredResults.length;
+            // Only use isPositive for sentiment
+            const sentiments = filteredResults.map(r => {
+                if (r.results && r.results.summary && typeof r.results.summary.isPositive === 'boolean') {
+                    return r.results.summary.isPositive ? 'positive' : 'negative';
+                }
+                return 'neutral';
+            });
+            const positiveCalls = sentiments.filter(s => s === 'positive').length;
+            const negativeCalls = sentiments.filter(s => s === 'negative').length;
+            const positiveSentiment = totalCalls > 0 ? Math.round((positiveCalls / totalCalls) * 100) : 0;
+            const negativeSentiment = totalCalls > 0 ? Math.round((negativeCalls / totalCalls) * 100) : 0;
+
+            // Calculate average duration
+            const durations = filteredResults
+                .filter(r => r.results?.audio_metadata?.duration)
+                .map(r => r.results.audio_metadata.duration);
+            const avgDuration = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60) : 0;
+
+            // Collect all unique issues
+            const allIssues = new Set();
+            filteredResults.forEach(result => {
+                if (result.results?.issues?.issues) {
+                    result.results.issues.issues.forEach(issue => {
+                        allIssues.add(issue.keyword);
+                    });
+                }
+            });
+
+            // Get top keywords
+            const keywordCounts = {};
+            filteredResults.forEach(result => {
+                if (result.results?.keywords?.keywords) {
+                    result.results.keywords.keywords.forEach(keyword => {
+                        keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1;
+                    });
+                }
+            });
+
+            const topKeywords = Object.entries(keywordCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 5)
+                .map(([keyword]) => keyword);
+
+            return {
+                totalCalls,
+                positiveCalls,
+                negativeCalls,
+                positiveSentiment,
+                negativeSentiment,
+                uniqueIssues: allIssues.size,
+                avgDuration,
+                topKeywords
+            };
+        }
+
+        function renderCharts() {
+            renderSentimentChart();
+            renderIssuesChart();
+            renderTrendChart();
+            renderCategoriesChart();
+        }
+
+        function renderSentimentChart() {
+            const ctx = document.getElementById('sentimentChart').getContext('2d');
+            
+            if (charts.sentimentChart) {
+                charts.sentimentChart.destroy();
+            }
+
+            const sentiments = filteredResults.map(r => getSentiment(r));
+            const sentimentCounts = {
+                positive: sentiments.filter(s => s === 'positive').length,
+                negative: sentiments.filter(s => s === 'negative').length,
+                neutral: sentiments.filter(s => s === 'neutral').length
+            };
+
+            charts.sentimentChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Positive', 'Negative', 'Neutral'],
+                    datasets: [{
+                        data: [sentimentCounts.positive, sentimentCounts.negative, sentimentCounts.neutral],
+                        backgroundColor: [
+                            '#10b981',
+                            '#ef4444',
+                            '#6b7280'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderIssuesChart() {
+            const ctx = document.getElementById('issuesChart').getContext('2d');
+            
+            if (charts.issuesChart) {
+                charts.issuesChart.destroy();
+            }
+
+            // Collect all issues
+            const issueCounts = {};
+            filteredResults.forEach(result => {
+                if (result.results?.issues?.issues) {
+                    result.results.issues.issues.forEach(issue => {
+                        issueCounts[issue.keyword] = (issueCounts[issue.keyword] || 0) + 1;
+                    });
+                }
+            });
+
+            const topIssues = Object.entries(issueCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 8);
+
+            if (topIssues.length === 0) {
+                charts.issuesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['No issues data'],
+                        datasets: [{
+                            label: 'Issues',
+                            data: [0],
+                            backgroundColor: '#6b7280'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+                return;
+            }
+
+            charts.issuesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topIssues.map(([issue]) => issue),
+                    datasets: [{
+                        label: 'Number of Occurrences',
+                        data: topIssues.map(([, count]) => count),
+                        backgroundColor: '#3b82f6',
+                        borderColor: '#2563eb',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTrendChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            if (charts.trendChart) {
+                charts.trendChart.destroy();
+            }
+
+            // Group by date
+            const dailyData = {};
+            filteredResults.forEach(result => {
+                const date = new Date(result.completed_at).toLocaleDateString();
+                if (!dailyData[date]) {
+                    dailyData[date] = { total: 0, positive: 0, negative: 0 };
+                }
+                dailyData[date].total++;
+                const sentiment = getSentiment(result);
+                if (sentiment === 'positive') dailyData[date].positive++;
+                if (sentiment === 'negative') dailyData[date].negative++;
+            });
+
+            const sortedDates = Object.keys(dailyData).sort();
+            const totals = sortedDates.map(date => dailyData[date].total);
+            const positives = sortedDates.map(date => dailyData[date].positive);
+            const negatives = sortedDates.map(date => dailyData[date].negative);
+
+            charts.trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [
+                        {
+                            label: 'Total Calls',
+                            data: totals,
+                            borderColor: '#273BEF',
+                            backgroundColor: 'rgba(39, 59, 239, 0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Positive',
+                            data: positives,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Negative',
+                            data: negatives,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCategoriesChart() {
+            const ctx = document.getElementById('categoriesChart').getContext('2d');
+            
+            if (charts.categoriesChart) {
+                charts.categoriesChart.destroy();
+            }
+
+            // Collect all top-level categories
+            const categoryCounts = {};
+            filteredResults.forEach(result => {
+                if (result.results?.categorisation?.response) {
+                    try {
+                        const categoryData = typeof result.results.categorisation.response === 'string' 
+                            ? JSON.parse(result.results.categorisation.response)
+                            : result.results.categorisation.response;
+                        
+                        // Use type_typologie as the top-level category
+                        const topLevel = categoryData.type_typologie;
+                        if (topLevel && topLevel !== 'N/A' && topLevel !== '') {
+                            categoryCounts[topLevel] = (categoryCounts[topLevel] || 0) + 1;
+                        }
+                    } catch (e) {
+                        // Fallback to string parsing for old format
+                        const categoryText = result.results.categorisation.response;
+                        const categoryList = categoryText.split(',').map(cat => cat.trim());
+                        categoryList.forEach(cat => {
+                            if (cat && cat !== 'N/A' && cat !== '') {
+                                const topLevel = cat.split('>')[0].trim();
+                                categoryCounts[topLevel] = (categoryCounts[topLevel] || 0) + 1;
+                            }
+                        });
+                    }
+                }
+            });
+
+            const topCategories = Object.entries(categoryCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 6);
+
+            if (topCategories.length === 0) {
+                charts.categoriesChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['No category data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#6b7280']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+                return;
+            }
+
+            charts.categoriesChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: topCategories.map(([category]) => category),
+                    datasets: [{
+                        data: topCategories.map(([, count]) => count),
+                        backgroundColor: [
+                            '#3b82f6',
+                            '#10b981',
+                            '#f59e0b',
+                            '#ef4444',
+                            '#8b5cf6',
+                            '#06b6d4'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderInsights() {
+            const insights = generateInsights();
+            const insightsGrid = document.getElementById('insightsGrid');
+            
+            insightsGrid.innerHTML = insights.map(insight => `
+                <div class="insight-card">
+                    <div class="insight-title">${insight.title}</div>
+                    <div class="insight-content">${insight.content}</div>
+                    ${insight.keywords ? `
+                        <div class="keyword-cloud">
+                            ${insight.keywords.map(keyword => 
+                                `<span class="keyword-tag ${insight.frequentKeywords.includes(keyword) ? 'frequent' : ''}">${keyword}</span>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function generateInsights() {
+            const insights = [];
+            
+            // Sentiment trend insight
+            const sentiments = filteredResults.map(r => getSentiment(r));
+            const positiveRate = sentiments.filter(s => s === 'positive').length / sentiments.length;
+            
+            if (positiveRate > 0.7) {
+                insights.push({
+                    title: 'Excellent Customer Satisfaction',
+                    content: `${Math.round(positiveRate * 100)}% of calls show positive sentiment, indicating strong customer service performance.`
+                });
+            } else if (positiveRate < 0.5) {
+                insights.push({
+                    title: 'Customer Satisfaction Alert',
+                    content: `Only ${Math.round(positiveRate * 100)}% of calls show positive sentiment. Consider reviewing service quality and agent training.`
+                });
+            }
+
+            // Top issues insight
+            const issueCounts = {};
+            filteredResults.forEach(result => {
+                if (result.results?.issues?.issues) {
+                    result.results.issues.issues.forEach(issue => {
+                        issueCounts[issue.keyword] = (issueCounts[issue.keyword] || 0) + 1;
+                    });
+                }
+            });
+
+            const topIssues = Object.entries(issueCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 3);
+
+            if (topIssues.length > 0) {
+                insights.push({
+                    title: 'Most Common Customer Issues',
+                    content: `Top issues: ${topIssues.map(([issue, count]) => `${issue} (${count} calls)`).join(', ')}. Consider proactive solutions for these recurring problems.`,
+                    keywords: topIssues.map(([issue]) => issue),
+                    frequentKeywords: topIssues.map(([issue]) => issue)
+                });
+            }
+
+            // Keyword trends
+            const keywordCounts = {};
+            filteredResults.forEach(result => {
+                if (result.results?.keywords?.keywords) {
+                    result.results.keywords.keywords.forEach(keyword => {
+                        keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1;
+                    });
+                }
+            });
+
+            const topKeywords = Object.entries(keywordCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 5);
+
+            if (topKeywords.length > 0) {
+                insights.push({
+                    title: 'Trending Keywords',
+                    content: 'Most frequently mentioned terms in customer conversations:',
+                    keywords: topKeywords.map(([keyword]) => keyword),
+                    frequentKeywords: topKeywords.slice(0, 3).map(([keyword]) => keyword)
+                });
+            }
+
+            // Call volume insight
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayCalls = filteredResults.filter(r => {
+                const callDate = new Date(r.completed_at);
+                callDate.setHours(0, 0, 0, 0);
+                return callDate.getTime() === today.getTime();
+            }).length;
+
+            if (todayCalls > 0) {
+                insights.push({
+                    title: 'Today\'s Activity',
+                    content: `${todayCalls} customer calls processed today. Monitor for any unusual patterns or issues.`
+                });
+            }
+
+            // Category insights
+            const categoryCounts = {};
+            filteredResults.forEach(result => {
+                if (result.results?.categorisation?.response) {
+                    try {
+                        const categoryData = typeof result.results.categorisation.response === 'string' 
+                            ? JSON.parse(result.results.categorisation.response)
+                            : result.results.categorisation.response;
+                        
+                        // Use type_typologie as the top-level category
+                        const topLevel = categoryData.type_typologie;
+                        if (topLevel && topLevel !== 'N/A' && topLevel !== '') {
+                            categoryCounts[topLevel] = (categoryCounts[topLevel] || 0) + 1;
+                        }
+                    } catch (e) {
+                        // Fallback to string parsing for old format
+                        const categoryText = result.results.categorisation.response;
+                        const categoryList = categoryText.split(',').map(cat => cat.trim());
+                        categoryList.forEach(cat => {
+                            if (cat && cat !== 'N/A' && cat !== '') {
+                                const topLevel = cat.split('>')[0].trim();
+                                categoryCounts[topLevel] = (categoryCounts[topLevel] || 0) + 1;
+                            }
+                        });
+                    }
+                }
+            });
+
+            const topCategories = Object.entries(categoryCounts)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 3);
+
+            if (topCategories.length > 0) {
+                insights.push({
+                    title: 'Most Common Categories',
+                    content: `Top categories: ${topCategories.map(([category, count]) => `${category} (${count} calls)`).join(', ')}. Focus on these areas for service improvement.`,
+                    keywords: topCategories.map(([category]) => category),
+                    frequentKeywords: topCategories.map(([category]) => category)
+                });
+            }
+
+            return insights;
+        }
+
+        function renderDataTable() {
+            const tableBody = document.getElementById('resultsTableBody');
+            const resultsCount = document.getElementById('resultsCount');
+            
+            resultsCount.textContent = `${filteredResults.length} interactions`;
+
+            tableBody.innerHTML = filteredResults
+                .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
+                .slice(0, 20) // Show only last 20 results
+                .map(result => {
+                    const date = new Date(result.completed_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    const duration = result.results?.audio_metadata?.duration 
+                        ? Math.round(result.results.audio_metadata.duration / 60) + ' min'
+                        : 'N/A';
+
+                    const sentiment = getSentiment(result);
+                    const sentimentText = sentiment.charAt(0).toUpperCase() + sentiment.slice(1);
+
+                    const keywords = result.results?.keywords?.keywords || [];
+                    const keywordText = keywords.slice(0, 3).join(', ') + (keywords.length > 3 ? '...' : '');
+
+                    const category = result.results?.categorisation?.response || 'N/A';
+                    
+                    // Format category based on structure
+                    let formattedCategory = 'N/A';
+                    try {
+                        const categoryData = typeof category === 'string' ? JSON.parse(category) : category;
+                        const levels = [
+                            categoryData.type_typologie,
+                            categoryData.type_incident,
+                            categoryData.categorie_operationnelle_1,
+                            categoryData.categorie_operationnelle_2,
+                            categoryData.categorie_operationnelle_3
+                        ].filter(level => level && level !== 'N/A' && level !== '');
+                        
+                        formattedCategory = levels.join(' > ');
+                    } catch (e) {
+                        // Fallback to string parsing for old format
+                        const categoryText = category.split(',')[0] || 'N/A';
+                        formattedCategory = categoryText.includes('>') 
+                            ? categoryText.split('>').map(level => level.trim()).join(' > ')
+                            : categoryText;
+                    }
+
+                    const mainIssue = result.results?.issues?.issues?.[0]?.keyword || 'N/A';
+
+                    return `
+                        <tr>
+                            <td>${date}</td>
+                            <td>${mainIssue}</td>
+                            <td><span class="sentiment-badge ${sentiment}">${sentimentText}</span></td>
+                            <td>${keywordText}</td>
+                            <td>${formattedCategory}</td>
+                            <td>${duration}</td>
+                            <td>
+                                <a href="/agent?taskId=${result.task_id}" class="btn secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+        }
+
+        function exportData() {
+            // Create CSV content with business intelligence data
+            const headers = ['Date', 'Task ID', 'Filename', 'Sentiment', 'Main Issue', 'Keywords', 'Category', 'Duration (min)', 'Summary'];
+            const csvContent = [
+                headers.join(','),
+                ...filteredResults.map(result => {
+                    const date = new Date(result.completed_at).toLocaleDateString();
+                    const sentiment = getSentiment(result);
+                    const keywords = result.results?.keywords?.keywords || [];
+                    const mainIssue = result.results?.issues?.issues?.[0]?.keyword || '';
+                    const category = result.results?.categorisation?.response || '';
+                    const duration = result.results?.audio_metadata?.duration 
+                        ? Math.round(result.results.audio_metadata.duration / 60)
+                        : '';
+                    const summary = result.results?.summary?.summary || '';
+
+                    return [
+                        date,
+                        result.task_id,
+                        `"${result.filename}"`,
+                        sentiment,
+                        `"${mainIssue}"`,
+                        `"${keywords.join('; ')}"`,
+                        `"${category}"`,
+                        duration,
+                        `"${summary.replace(/"/g, '""')}"`
+                    ].join(',');
+                })
+            ].join('\n');
+
+            // Download CSV file
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `customer_care_intelligence_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Collapsible section functions
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const content = section.querySelector('.collapsible-content');
+            const icon = section.querySelector('.collapsible-icon');
+            
+            if (content.classList.contains('collapsed')) {
+                expandSection(sectionId);
+            } else {
+                collapseSection(sectionId);
+            }
+        }
+
+        function expandSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const content = section.querySelector('.collapsible-content');
+            const icon = section.querySelector('.collapsible-icon');
+            content.classList.remove('collapsed');
+            icon.classList.remove('collapsed');
+            section.classList.remove('collapsed');
+        }
+
+        function collapseSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const content = section.querySelector('.collapsible-content');
+            const icon = section.querySelector('.collapsible-icon');
+            content.classList.add('collapsed');
+            icon.classList.add('collapsed');
+            section.classList.add('collapsed');
+        }
+
+        function expandAllSections() {
+            const sections = ['filtersSection', 'categorySection'];
+            sections.forEach(sectionId => {
+                expandSection(sectionId);
+            });
+            
+            // Update quick action buttons
+            document.querySelectorAll('.quick-action-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+        }
+
+        function collapseAllSections() {
+            const sections = ['filtersSection', 'categorySection'];
+            sections.forEach(sectionId => {
+                collapseSection(sectionId);
+            });
+            
+            // Update quick action buttons
+            document.querySelectorAll('.quick-action-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+        }
+    </script>
+    <script src="/static/sidebar.js?v=2.0"></script>
+</body>
+</html>

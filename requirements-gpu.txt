@@ -1,5 +1,5 @@
-# GPU-Optimized Requirements for H100/Production
-# This file is only used when building with GPU support
+# GPU-Optimized Requirements for RunPod PyTorch 2.4.0
+# Compatible avec runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 # Base requirements (same as current)
 fastapi==0.104.1
@@ -12,35 +12,37 @@ aiofiles==23.2.1
 # Fallback CPU whisper (for compatibility)
 openai-whisper==20231117
 
-
 # System monitoring
 psutil==5.9.6
 
-# GPU-Accelerated Whisper (10-100x faster than CPU)
-faster-whisper==0.10.0
+# Transcription GPU - Compatible avec PyTorch 2.4.0
+faster-whisper>=0.10.0
 
-# PyTorch with CUDA support
-torch>=2.0.0
-torchaudio>=2.0.0
+# PyTorch - Utiliser les versions déjà installées dans RunPod
+# torch==2.4.0  # Déjà installé dans l'image RunPod
+# torchaudio==2.4.0  # Déjà installé dans l'image RunPod
+transformers>=4.36.0
 
-# Speaker Diarization (offline-capable)
-pyannote.audio>=3.1.0
+# Diarisation pyannote - Versions compatibles PyTorch 2.4.0
+pyannote.audio>=3.1.0,<3.4.0
 pyannote.core>=5.0.0
 pyannote.database>=5.0.0
 pyannote.metrics>=3.2.0
 
-# Audio processing for diarization
-scipy>=1.10.0
-scikit-learn>=1.3.0
-speechbrain>=0.5.0
+# Audio processing - Enhanced
+librosa>=0.10.1
+soundfile>=0.12.1
+scipy>=1.11.0
 
-# Optional: Specific CUDA version for H100
-# torch==2.1.0+cu121 --index-url https://download.pytorch.org/whl/cu121
-# torchaudio==2.1.0+cu121 --index-url https://download.pytorch.org/whl/cu121
+# Clustering et ML - Compatible versions
+scikit-learn>=1.3.0
+numba>=0.58.0
+numpy>=1.24.0
 
 # Memory optimization for large models
 memory-profiler==0.61.0
 
-# Enhanced audio processing
-librosa==0.10.1
-soundfile==0.12.1 
+# Note: speechbrain et asteroid peuvent causer des conflits
+# On les ajoute optionnellement si nécessaire
+# speechbrain>=0.5.16
+# asteroid>=0.7.0 

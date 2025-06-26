@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Steps & Prompts - Audio Transcript Analysis</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="/static/sidebar.css" rel="stylesheet">
+    <link href="/static/sidebar.css?v=2.0" rel="stylesheet">
     <script src="/static/utils.js"></script>
     <style>
         * {
@@ -79,6 +79,91 @@
             transition: all 0.3s ease;
             font-weight: 500;
             font-size: 1rem;
+        }
+
+        .step-type-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: 0.5rem;
+        }
+
+        .step-type-audio {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .step-type-llm {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .parameters-section {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .parameters-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.75rem;
+        }
+
+        .parameter-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.85rem;
+        }
+
+        .parameter-item:last-child {
+            border-bottom: none;
+        }
+
+        .parameter-name {
+            color: #6b7280;
+            font-family: monospace;
+        }
+
+        .parameter-value {
+            color: #374151;
+            font-weight: 500;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .parameter-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: start;
+        }
+
+        .parameter-group {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .parameter-group-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 0.5rem;
         }
 
         .tab-btn:hover {
@@ -500,101 +585,90 @@
     <div class="container">
         <div class="header">
             <img src="/static/logo.png" alt="Logo" class="logo">
-            <h1>Steps & Prompts Management</h1>
-            <p>Configure processing steps and manage prompt templates</p>
         </div>
 
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('steps')">
-                <i class="fas fa-list-ol"></i>
-                Processing Steps
-            </button>
-            <button class="tab-btn" onclick="switchTab('prompts')">
-                <i class="fas fa-file-text"></i>
-                Prompt Templates
-            </button>
-        </div>
-
-        <!-- Steps Tab -->
-        <div id="steps-tab" class="tab-content active">
-            <div class="card">
-                <div class="section-header">
-                    <h2 class="section-title">Processing Steps Configuration</h2>
-                    <button class="btn btn-primary" onclick="openStepModal()">
-                        <i class="fas fa-plus"></i>
-                        Add New Step
-                    </button>
-                </div>
-                
-                <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 12px; padding: 1rem; margin-bottom: 2rem;">
-                    <h4 style="color: #0c4a6e; margin-bottom: 0.5rem;">
-                        <i class="fas fa-info-circle"></i>
-                        Sequential-Parallel Processing
-                    </h4>
-                    <p style="color: #0c4a6e; font-size: 0.9rem; margin: 0;">
-                        Steps with the same <strong>order number</strong> run in parallel. Steps with different order numbers run sequentially. 
-                        For example: Order 1 (transcription) → Order 2 (qualification + issues + categorization in parallel) → Order 3 (sentiment analysis).
-                        <br><strong>Multiple steps can share the same order number!</strong>
-                    </p>
-                </div>
-                
-                <div id="steps-loading" class="loading">
-                    <i class="fas fa-spinner"></i>
-                    <p>Loading steps...</p>
-                </div>
-                
-                <div id="steps-error" class="error" style="display: none;"></div>
-                <div id="steps-success" class="success" style="display: none;"></div>
-                
-                <div id="steps-grid" class="steps-grid">
-                    <!-- Steps will be loaded here -->
-                </div>
+        <div class="card">
+            <div class="section-header" style="justify-content: space-between; align-items: center; gap: 2rem;">
+                <h2 class="section-title">Processing Steps</h2>
+                <button class="btn btn-primary" onclick="openStepModal()">
+                    <i class="fas fa-plus"></i>
+                    Add New Step
+                </button>
             </div>
-        </div>
-
-        <!-- Prompts Tab -->
-        <div id="prompts-tab" class="tab-content">
-            <div class="card">
-                <div class="section-header">
-                    <h2 class="section-title">Prompt Templates</h2>
-                    <button class="btn btn-primary" onclick="openPromptModal()">
-                        <i class="fas fa-plus"></i>
-                        Create New Prompt
-                    </button>
-                </div>
-                
-                <div id="prompts-loading" class="loading">
-                    <i class="fas fa-spinner"></i>
-                    <p>Loading prompts...</p>
-                </div>
-                
-                <div id="prompts-error" class="error" style="display: none;"></div>
-                <div id="prompts-success" class="success" style="display: none;"></div>
-                
-                <div id="prompts-list" class="prompts-list">
-                    <!-- Prompts will be loaded here -->
-                </div>
+            
+            <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 12px; padding: 1rem; margin-bottom: 2rem;">
+                <h4 style="color: #0c4a6e; margin-bottom: 0.5rem;">
+                    <i class="fas fa-info-circle"></i>
+                    Sequential-Parallel Processing & Input Sources
+                </h4>
+                <p style="color: #0c4a6e; font-size: 0.9rem; margin: 0;">
+                    Steps with the same <strong>order number</strong> run in parallel. Steps with different order numbers run sequentially. 
+                    Each step can choose its <strong>input source</strong>: either the full transcript or the result from a previous step.
+                    <br>For example: Order 1 (qualification using transcript) → Order 2 (categorization using summary + issues using transcript in parallel).
+                    <br><strong>Multiple steps can share the same order number and use different input sources!</strong>
+                </p>
+            </div>
+            
+            <div id="steps-loading" class="loading">
+                <i class="fas fa-spinner"></i>
+                <p>Loading steps...</p>
+            </div>
+            
+            <div id="steps-error" class="error" style="display: none;"></div>
+            <div id="steps-success" class="success" style="display: none;"></div>
+            
+            <div id="steps-grid" class="steps-grid">
+                <!-- Steps will be loaded here -->
             </div>
         </div>
     </div>
 
     <!-- Step Modal -->
     <div id="step-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 900px;">
             <div class="modal-header">
                 <h3 class="modal-title">Configure Step</h3>
                 <button class="close-btn" onclick="closeStepModal()">&times;</button>
             </div>
             
             <form id="step-form">
+                <!-- Step Type Selection -->
+                <div class="form-group">
+                    <label class="form-label">Step Type</label>
+                    <div style="display: flex; gap: 1rem;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="step-type" value="audio" onchange="handleStepTypeChange()" style="margin-right: 0.5rem;">
+                            <span class="step-type-badge step-type-audio">🎵 Audio Processing</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="step-type" value="llm" onchange="handleStepTypeChange()" style="margin-right: 0.5rem;" checked>
+                            <span class="step-type-badge step-type-llm">🤖 LLM Analysis</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Audio Step Template Selection -->
+                <div id="audio-template-section" class="form-group" style="display: none;">
+                    <label class="form-label" for="audio-template">Audio Step Template</label>
+                    <select id="audio-template" class="form-input" onchange="loadAudioTemplate()">
+                        <option value="">Select a template...</option>
+                        <option value="audio_loading">Audio Loading & Preprocessing</option>
+                        <option value="language_detection">Language Detection</option>
+                        <option value="diarization">Speaker Diarization</option>
+                        <option value="transcription">Audio Transcription</option>
+                        <option value="custom">Custom Audio Step</option>
+                    </select>
+                </div>
+                
+                <!-- Basic Step Info -->
                 <div class="form-group">
                     <label class="form-label" for="step-id">Step ID</label>
-                    <input type="text" id="step-id" class="form-input" placeholder="e.g., sentiment_analysis" required>
+                    <input type="text" id="step-id" class="form-input" placeholder="Auto-generated from step name" required readonly style="background-color: #f8fafc; color: #64748b;">
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label" for="step-name">Step Name</label>
-                    <input type="text" id="step-name" class="form-input" placeholder="e.g., Sentiment Analysis" required>
+                    <input type="text" id="step-name" class="form-input" placeholder="e.g., Sentiment Analysis" required oninput="updateStepIdFromName()">
                 </div>
                 
                 <div class="form-group">
@@ -602,11 +676,25 @@
                     <input type="text" id="step-description" class="form-input" placeholder="Brief description of what this step does">
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label" for="step-prompt-file">Prompt File</label>
-                    <select id="step-prompt-file" class="form-input" required>
-                        <option value="">Select a prompt file...</option>
-                    </select>
+                <!-- LLM-specific fields -->
+                <div id="llm-fields">
+                    <div class="form-group">
+                        <label class="form-label" for="step-prompt-content">Prompt Template</label>
+                        <textarea id="step-prompt-content" class="form-input form-textarea" placeholder="Enter your prompt instructions here. The selected input source will be automatically appended to your prompt." style="min-height: 200px; font-family: 'Fira Code', monospace;"></textarea>
+                        <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                            This prompt will be saved as <span id="prompt-filename-display" style="font-family: monospace; background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px;"></span>
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Audio-specific parameters -->
+                <div id="audio-parameters" style="display: none;">
+                    <div class="parameter-group">
+                        <div class="parameter-group-title">Audio Processing Parameters</div>
+                        <div id="audio-parameters-content">
+                            <!-- Parameters will be dynamically loaded here -->
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -616,9 +704,19 @@
                 
                 <div class="form-group">
                     <label class="form-label" for="step-order">Processing Order</label>
-                    <input type="number" id="step-order" class="form-input" min="1" required>
+                    <input type="number" id="step-order" class="form-input" min="1" required onchange="updateInputSourceOptions()">
                     <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
-                        Steps with the same order number run in parallel. Lower numbers run first. Multiple steps can have the same order!
+                        Steps with the same order number run in parallel. Lower numbers run first.
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="step-input-source">Input Source</label>
+                    <select id="step-input-source" class="form-input" required>
+                        <option value="transcript">Full Transcript</option>
+                    </select>
+                    <small style="color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                        Choose the input for this step: transcript or result from a previous step.
                     </small>
                 </div>
                 
@@ -629,97 +727,38 @@
                     </label>
                 </div>
                 
-                <div class="btn-group">
+                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeStepModal()">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="testStep()" id="test-step-btn">
+                        <i class="fas fa-flask"></i>
+                        Test Step
+                    </button>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i>
                         Save Step
                     </button>
-                    <button type="button" class="btn btn-secondary" onclick="testStep()">
-                        <i class="fas fa-flask"></i>
-                        Test Step
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="closeStepModal()">
-                        Cancel
-                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Prompt Modal -->
-    <div id="prompt-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Edit Prompt Template</h3>
-                <button class="close-btn" onclick="closePromptModal()">&times;</button>
-            </div>
-            
-            <form id="prompt-form">
-                <div class="form-group">
-                    <label class="form-label" for="prompt-filename">Filename</label>
-                    <input type="text" id="prompt-filename" class="form-input" placeholder="e.g., sentiment.txt" required>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="prompt-description">Description</label>
-                    <input type="text" id="prompt-description" class="form-input" placeholder="Brief description of this prompt">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="prompt-content">Prompt Content</label>
-                    <textarea id="prompt-content" class="form-input form-textarea" placeholder="Enter your prompt template here..." required></textarea>
-                </div>
-                
-                <div class="btn-group">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i>
-                        Save Prompt
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="testPrompt()">
-                        <i class="fas fa-flask"></i>
-                        Test Prompt
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="closePromptModal()">
-                        Cancel
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+
 
     <script>
         let currentSteps = {};
-        let currentPrompts = [];
         let editingStep = null;
-        let editingPrompt = null;
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            Sidebar.init();
-            loadSteps();
-            loadPrompts();
-        });
-
-        // === SIDEBAR EVENT HANDLERS ===
-        // Handled by shared Sidebar utility in utils.js
-
-        // Tab switching
-        function switchTab(tab) {
-            // Update tab buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
-
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            document.getElementById(`${tab}-tab`).classList.add('active');
-
-            // Load data if needed
-            if (tab === 'steps') {
-                loadSteps();
-            } else if (tab === 'prompts') {
-                loadPrompts();
+            // Initialize the modern sidebar
+            if (window.Sidebar) {
+                Sidebar.init();
             }
-        }
+            loadAudioData();
+            loadSteps();
+        });
 
         // Load steps
         async function loadSteps() {
@@ -729,6 +768,25 @@
 
                 const data = await API.get('/api/steps');
                 currentSteps = data.steps;
+                
+                // Load prompt content for each step
+                for (const [stepId, step] of Object.entries(currentSteps)) {
+                    if (step.prompt_file) {
+                        try {
+                            const promptResponse = await fetch(`/api/prompts/${step.prompt_file}`);
+                            if (promptResponse.ok) {
+                                const promptData = await promptResponse.json();
+                                step.prompt_content = promptData.content;
+                                step.prompt_preview = promptData.content.length > 150 
+                                    ? promptData.content.substring(0, 150) + '...' 
+                                    : promptData.content;
+                            }
+                        } catch (e) {
+                            console.warn(`Failed to load prompt for step ${stepId}:`, e);
+                        }
+                    }
+                }
+                
                 renderSteps();
                 hideLoading('steps');
             } catch (error) {
@@ -797,11 +855,34 @@
             const card = document.createElement('div');
             card.className = 'step-card';
             
+            const stepTypeClass = step.step_type === 'audio' ? 'step-type-audio' : 'step-type-llm';
+            const stepTypeName = step.step_type === 'audio' ? '🎵 Audio' : '🤖 LLM';
+            
+            // Parameters preview for audio steps
+            let parametersHtml = '';
+            if (step.step_type === 'audio' && step.parameters && Object.keys(step.parameters).length > 0) {
+                const paramCount = Object.keys(step.parameters).length;
+                const topParams = Object.entries(step.parameters).slice(0, 3);
+                parametersHtml = `
+                    <div class="parameters-section">
+                        <div class="parameters-title">Parameters (${paramCount})</div>
+                        ${topParams.map(([key, value]) => `
+                            <div class="parameter-item">
+                                <span class="parameter-name">${key}</span>
+                                <span class="parameter-value">${formatParameterValue(value)}</span>
+                            </div>
+                        `).join('')}
+                        ${paramCount > 3 ? `<div style="text-align: center; margin-top: 0.5rem; color: #6b7280; font-size: 0.8rem;">... and ${paramCount - 3} more</div>` : ''}
+                    </div>
+                `;
+            }
+            
             card.innerHTML = `
                 <div class="step-header">
                     <div>
                         <div class="step-title">
                             ${step.name}
+                            <span class="step-type-badge ${stepTypeClass}">${stepTypeName}</span>
                             <span class="step-order-badge">Order ${step.order}</span>
                         </div>
                         <div class="step-id">${stepId}</div>
@@ -813,19 +894,30 @@
                 
                 <div class="step-meta">
                     <div class="step-meta-item">
-                        <span class="step-meta-label">Prompt:</span>
-                        <span class="step-meta-value">${step.prompt_file}</span>
-                    </div>
-                    <div class="step-meta-item">
                         <span class="step-meta-label">Result Key:</span>
                         <span class="step-meta-value">${step.result_key}</span>
+                    </div>
+                    <div class="step-meta-item">
+                        <span class="step-meta-label">Input Source:</span>
+                        <span class="step-meta-value">
+                            ${step.input_source === 'transcript' ? 'Full Transcript' : step.input_source}
+                            ${step.input_source !== 'transcript' ? `<i class="fas fa-link" style="margin-left: 0.5rem; color: #273BEF;"></i>` : ''}
+                        </span>
                     </div>
                     ${step.description ? `
                     <div class="step-meta-item" style="margin-top: 0.5rem;">
                         <span style="color: #64748b; font-size: 0.85rem;">${step.description}</span>
                     </div>
                     ` : ''}
+                    ${step.prompt_preview ? `
+                    <div style="margin-top: 1rem;">
+                        <span class="step-meta-label">Prompt Preview:</span>
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; font-family: monospace; font-size: 0.8rem; color: #475569; max-height: 80px; overflow-y: auto; white-space: pre-wrap;">${step.prompt_preview}</div>
+                    </div>
+                    ` : ''}
                 </div>
+                
+                ${parametersHtml}
                 
                 <div class="step-actions">
                     <button class="btn btn-secondary" onclick="editStep('${stepId}')">
@@ -847,108 +939,218 @@
             return card;
         }
 
-        // Load prompts
-        async function loadPrompts() {
-            try {
-                showLoading('prompts');
-                hideMessage('prompts');
-
-                const data = await API.get('/api/prompts');
-                currentPrompts = data.prompts;
-                renderPrompts();
-                updatePromptOptions();
-                hideLoading('prompts');
-            } catch (error) {
-                console.error('Error loading prompts:', error);
-                showError('prompts', error.message);
-                hideLoading('prompts');
+        // Format parameter value for display
+        function formatParameterValue(value) {
+            if (typeof value === 'object' && value !== null) {
+                return JSON.stringify(value).substring(0, 30) + '...';
             }
+            return String(value).substring(0, 30) + (String(value).length > 30 ? '...' : '');
         }
 
-        // Render prompts
-        function renderPrompts() {
-            const list = document.getElementById('prompts-list');
-            list.innerHTML = '';
 
-            if (currentPrompts.length === 0) {
-                list.innerHTML = '<p style="text-align: center; color: #64748b;">No prompts found. Create your first prompt to get started.</p>';
-                return;
-            }
 
-            currentPrompts.forEach(prompt => {
-                const promptItem = createPromptItem(prompt);
-                list.appendChild(promptItem);
-            });
+        // Convert step name to valid step ID
+        function generateStepIdFromName(name) {
+            return name
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9\s]/g, '') // Remove special characters except spaces
+                .replace(/\s+/g, '_') // Replace spaces with underscores
+                .replace(/_+/g, '_') // Replace multiple underscores with single
+                .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
         }
 
-        // Create prompt item
-        function createPromptItem(prompt) {
-            const item = document.createElement('div');
-            item.className = 'prompt-item';
+        // Update step ID automatically from step name (only for new steps)
+        function updateStepIdFromName() {
+            const stepIdField = document.getElementById('step-id');
+            const stepNameField = document.getElementById('step-name');
             
-            const usedBySteps = prompt.used_by_steps || [];
-            const preview = prompt.content.length > 200 
-                ? prompt.content.substring(0, 200) + '...' 
-                : prompt.content;
-
-            item.innerHTML = `
-                <div class="prompt-header">
-                    <div class="prompt-name">${prompt.filename}</div>
-                    <div>
-                        ${usedBySteps.map(step => 
-                            `<span class="prompt-usage">Used by: ${step}</span>`
-                        ).join('')}
-                    </div>
-                </div>
-                
-                <div class="prompt-info">
-                    <span>Size: ${formatBytes(prompt.size)}</span>
-                    <span>Used by ${usedBySteps.length} step(s)</span>
-                </div>
-                
-                <div class="prompt-preview">${preview}</div>
-                
-                <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="editPrompt('${prompt.filename}')">
-                        <i class="fas fa-edit"></i>
-                        Edit
-                    </button>
-                    <button class="btn btn-secondary" onclick="testPromptByFilename('${prompt.filename}')">
-                        <i class="fas fa-flask"></i>
-                        Test
-                    </button>
-                    <button class="btn btn-danger" onclick="deletePrompt('${prompt.filename}')" 
-                            ${usedBySteps.length > 0 ? 'disabled title="Cannot delete: prompt is in use"' : ''}>
-                        <i class="fas fa-trash"></i>
-                        Delete
-                    </button>
-                </div>
-            `;
-
-            return item;
+            // Only auto-generate for new steps (when field is not disabled)
+            if (!stepIdField.disabled && stepNameField.value.trim()) {
+                const generatedId = generateStepIdFromName(stepNameField.value);
+                stepIdField.value = generatedId;
+                updateFilenameDisplay();
+            }
         }
 
-        // Update prompt options in step form
-        function updatePromptOptions() {
-            const select = document.getElementById('step-prompt-file');
+        // Update filename display
+        function updateFilenameDisplay() {
+            const stepId = document.getElementById('step-id').value;
+            const display = document.getElementById('prompt-filename-display');
+            if (stepId) {
+                display.textContent = `${stepId}.txt`;
+            } else {
+                display.textContent = 'step_id.txt';
+            }
+        }
+
+        // Update input source options in step form
+        async function updateInputSourceOptions() {
+            const select = document.getElementById('step-input-source');
             const currentValue = select.value;
+            const currentOrder = parseInt(document.getElementById('step-order').value) || 999;
             
-            select.innerHTML = '<option value="">Select a prompt file...</option>';
+            console.log('updateInputSourceOptions: currentOrder =', currentOrder);
             
-            currentPrompts.forEach(prompt => {
-                const option = document.createElement('option');
-                option.value = prompt.filename;
-                option.textContent = prompt.filename;
-                select.appendChild(option);
-            });
+            select.innerHTML = '';
             
-            if (currentValue) {
-                select.value = currentValue;
+            try {
+                // Get available input sources from backend API
+                const response = await API.get(`/api/available-input-sources?order=${currentOrder}`);
+                const inputSources = response.input_sources;
+                
+                console.log('Available input sources from API:', inputSources);
+                
+                // Add options based on API response
+                inputSources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source.value;
+                    option.textContent = source.label;
+                    option.setAttribute('data-type', source.type);
+                    if (source.source_step) {
+                        option.setAttribute('data-source-step', source.source_step);
+                    }
+                    select.appendChild(option);
+                    console.log('Added input source option:', source.value, '(', source.type, ')');
+                });
+                
+                // If no options available, show a message
+                if (inputSources.length === 0) {
+                    const noOption = document.createElement('option');
+                    noOption.value = '';
+                    noOption.textContent = 'No input sources available from previous steps';
+                    noOption.disabled = true;
+                    select.appendChild(noOption);
+                    console.log('No input sources available');
+                }
+                
+                // Restore previous value if still valid
+                if (currentValue) {
+                    const optionExists = Array.from(select.options).some(option => option.value === currentValue);
+                    if (optionExists) {
+                        select.value = currentValue;
+                    } else if (select.children.length > 0 && !select.children[0].disabled) {
+                        select.selectedIndex = 0; // Select first valid option
+                    }
+                } else if (select.children.length > 0 && !select.children[0].disabled) {
+                    select.selectedIndex = 0; // Select first valid option
+                }
+                
+            } catch (error) {
+                console.error('Error fetching available input sources:', error);
+                // Fallback to showing a basic option
+                const errorOption = document.createElement('option');
+                errorOption.value = '';
+                errorOption.textContent = 'Error loading input sources';
+                errorOption.disabled = true;
+                select.appendChild(errorOption);
             }
+        }
+
+        // Global variables for templates and schemas
+        let audioTemplates = {};
+        let parameterSchemas = {};
+
+        // Load audio templates and schemas
+        async function loadAudioData() {
+            try {
+                const [templatesResponse, schemasResponse] = await Promise.all([
+                    API.get('/api/audio-step-templates'),
+                    API.get('/api/parameter-schemas')
+                ]);
+                audioTemplates = templatesResponse.templates;
+                parameterSchemas = schemasResponse.schemas;
+            } catch (error) {
+                console.error('Failed to load audio data:', error);
+            }
+        }
+
+        // Handle step type change
+        function handleStepTypeChange() {
+            const stepType = document.querySelector('input[name="step-type"]:checked').value;
+            const audioTemplateSection = document.getElementById('audio-template-section');
+            const llmFields = document.getElementById('llm-fields');
+            const audioParameters = document.getElementById('audio-parameters');
+            const testBtn = document.getElementById('test-step-btn');
+            
+            if (stepType === 'audio') {
+                audioTemplateSection.style.display = 'block';
+                llmFields.style.display = 'none';
+                audioParameters.style.display = 'block';
+                testBtn.style.display = 'none'; // Hide test for audio steps
+            } else {
+                audioTemplateSection.style.display = 'none';
+                llmFields.style.display = 'block';
+                audioParameters.style.display = 'none';
+                testBtn.style.display = 'inline-flex';
+            }
+        }
+
+        // Load audio template
+        function loadAudioTemplate() {
+            const templateId = document.getElementById('audio-template').value;
+            if (!templateId || templateId === 'custom') return;
+            
+            const template = audioTemplates[templateId];
+            if (!template) return;
+            
+            // Fill form with template data
+            document.getElementById('step-name').value = template.name;
+            document.getElementById('step-description').value = template.description;
+            document.getElementById('step-result-key').value = template.result_key;
+            document.getElementById('step-input-source').value = template.input_source;
+            
+            // Generate step ID
+            updateStepIdFromName();
+            
+            // Load parameters
+            renderAudioParameters(templateId, template.parameters);
+        }
+
+        // Render audio parameters form
+        function renderAudioParameters(stepType, parameters = {}) {
+            const container = document.getElementById('audio-parameters-content');
+            const schema = parameterSchemas[stepType] || {};
+            
+            let html = '';
+            
+            for (const [paramName, paramConfig] of Object.entries(schema)) {
+                const currentValue = parameters[paramName] !== undefined ? parameters[paramName] : paramConfig.default;
+                
+                html += `<div class="parameter-row">`;
+                html += `<label class="form-label">${paramName}</label>`;
+                
+                if (paramConfig.type === 'boolean') {
+                    html += `<input type="checkbox" id="param-${paramName}" ${currentValue ? 'checked' : ''} style="width: auto;">`;
+                } else if (paramConfig.type === 'select') {
+                    html += `<select id="param-${paramName}" class="form-input">`;
+                    for (const option of paramConfig.options) {
+                        html += `<option value="${option}" ${currentValue === option ? 'selected' : ''}>${option}</option>`;
+                    }
+                    html += `</select>`;
+                } else if (paramConfig.type === 'number') {
+                    const min = paramConfig.min !== undefined ? `min="${paramConfig.min}"` : '';
+                    const max = paramConfig.max !== undefined ? `max="${paramConfig.max}"` : '';
+                    const step = paramConfig.step !== undefined ? `step="${paramConfig.step}"` : '';
+                    html += `<input type="number" id="param-${paramName}" class="form-input" value="${currentValue}" ${min} ${max} ${step}>`;
+                } else if (paramConfig.type === 'textarea') {
+                    html += `<textarea id="param-${paramName}" class="form-input" style="min-height: 100px; resize: vertical;" placeholder="${paramConfig.description || ''}">${currentValue}</textarea>`;
+                } else {
+                    html += `<input type="text" id="param-${paramName}" class="form-input" value="${currentValue}">`;
+                }
+                
+                if (paramConfig.description) {
+                    html += `<small style="color: #6b7280; font-size: 0.8rem; margin-top: 0.25rem; display: block; grid-column: 1 / -1;">${paramConfig.description}</small>`;
+                }
+                
+                html += `</div>`;
+            }
+            
+            container.innerHTML = html;
         }
 
         // Step management functions
-        function openStepModal(stepId = null) {
+        async function openStepModal(stepId = null) {
             editingStep = stepId;
             const modal = document.getElementById('step-modal');
             const form = document.getElementById('step-form');
@@ -959,23 +1161,55 @@
             if (stepId && currentSteps[stepId]) {
                 // Edit mode
                 const step = currentSteps[stepId];
+                
+                // Set step type
+                document.querySelector(`input[name="step-type"][value="${step.step_type || 'llm'}"]`).checked = true;
+                handleStepTypeChange();
+                
                 document.getElementById('step-id').value = stepId;
                 document.getElementById('step-id').disabled = true;
+                document.getElementById('step-id').readOnly = true;
                 document.getElementById('step-name').value = step.name;
                 document.getElementById('step-description').value = step.description || '';
-                document.getElementById('step-prompt-file').value = step.prompt_file;
                 document.getElementById('step-result-key').value = step.result_key;
                 document.getElementById('step-order').value = step.order;
                 document.getElementById('step-enabled').checked = step.enabled;
                 document.querySelector('#step-modal .modal-title').textContent = 'Edit Step';
+                
+                if (step.step_type === 'llm') {
+                    document.getElementById('step-prompt-content').value = step.prompt_content || '';
+                    updateFilenameDisplay();
+                } else if (step.step_type === 'audio') {
+                    // Find matching template
+                    const templateId = Object.keys(audioTemplates).find(id => 
+                        audioTemplates[id].name === step.name || id === stepId
+                    );
+                    if (templateId) {
+                        document.getElementById('audio-template').value = templateId;
+                        renderAudioParameters(templateId, step.parameters || {});
+                    }
+                }
+                
+                // Update options AFTER setting the order value
+                await updateInputSourceOptions();
+                document.getElementById('step-input-source').value = step.input_source || 'transcript';
+                
             } else {
                 // Create mode
+                document.querySelector('input[name="step-type"][value="llm"]').checked = true;
+                handleStepTypeChange();
+                
                 document.getElementById('step-id').disabled = false;
+                document.getElementById('step-id').readOnly = true;
+                document.getElementById('step-id').value = '';
                 document.getElementById('step-order').value = Math.max(...Object.values(currentSteps).map(s => s.order), 0) + 1;
                 document.querySelector('#step-modal .modal-title').textContent = 'Create New Step';
+                
+                await updateInputSourceOptions();
+                document.getElementById('step-input-source').value = 'transcript';
+                updateFilenameDisplay();
             }
             
-            updatePromptOptions();
             modal.style.display = 'block';
         }
 
@@ -1033,105 +1267,79 @@
             }
         }
 
-        // Prompt management functions
-        function openPromptModal(filename = null) {
-            editingPrompt = filename;
-            const modal = document.getElementById('prompt-modal');
-            const form = document.getElementById('prompt-form');
-            
-            // Reset form
-            form.reset();
-            
-            if (filename) {
-                // Edit mode - load prompt content
-                loadPromptForEdit(filename);
-                document.querySelector('#prompt-modal .modal-title').textContent = 'Edit Prompt Template';
-            } else {
-                // Create mode
-                document.querySelector('#prompt-modal .modal-title').textContent = 'Create New Prompt Template';
-            }
-            
-            modal.style.display = 'block';
-        }
 
-        async function loadPromptForEdit(filename) {
-            try {
-                const response = await fetch(`/api/prompts/${filename}`);
-                const prompt = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(prompt.detail || 'Failed to load prompt');
-                }
-
-                document.getElementById('prompt-filename').value = filename;
-                document.getElementById('prompt-filename').disabled = true;
-                document.getElementById('prompt-description').value = prompt.description || '';
-                document.getElementById('prompt-content').value = prompt.content;
-            } catch (error) {
-                console.error('Error loading prompt:', error);
-                showError('prompts', error.message);
-                closePromptModal();
-            }
-        }
-
-        function closePromptModal() {
-            document.getElementById('prompt-modal').style.display = 'none';
-            editingPrompt = null;
-            document.getElementById('prompt-filename').disabled = false;
-        }
-
-        function editPrompt(filename) {
-            openPromptModal(filename);
-        }
-
-        async function deletePrompt(filename) {
-            if (!confirm(`Are you sure you want to delete prompt "${filename}"?`)) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/prompts/${filename}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to delete prompt');
-                }
-
-                showSuccess('prompts', 'Prompt deleted successfully');
-                loadPrompts();
-            } catch (error) {
-                console.error('Error deleting prompt:', error);
-                showError('prompts', error.message);
-            }
-        }
 
         // Form submissions
         document.getElementById('step-form').addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            const stepType = document.querySelector('input[name="step-type"]:checked').value;
+            const stepId = editingStep || document.getElementById('step-id').value;
+            
             const stepData = {
-                step_id: document.getElementById('step-id').value,
+                step_id: stepId,
                 name: document.getElementById('step-name').value,
+                step_type: stepType,
                 description: document.getElementById('step-description').value || undefined,
-                prompt_file: document.getElementById('step-prompt-file').value,
                 result_key: document.getElementById('step-result-key').value,
                 order: parseInt(document.getElementById('step-order').value),
+                input_source: document.getElementById('step-input-source').value,
                 enabled: document.getElementById('step-enabled').checked
             };
 
             try {
-                // Use editingStep if we're editing, otherwise use the form value
-                const stepId = editingStep || stepData.step_id;
-                const response = await fetch(`/api/steps/${stepId}`, {
+                if (stepType === 'llm') {
+                    // Handle LLM step - save prompt first
+                    const promptContent = document.getElementById('step-prompt-content').value;
+                    const promptFilename = `${stepId}.txt`;
+                    
+                    const promptResponse = await fetch(`/api/prompts/${promptFilename}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: promptFilename,
+                            content: promptContent
+                        })
+                    });
+
+                    if (!promptResponse.ok) {
+                        const error = await promptResponse.json();
+                        throw new Error(error.detail || 'Failed to save prompt');
+                    }
+                    
+                    stepData.prompt_file = promptFilename;
+                    
+                } else if (stepType === 'audio') {
+                    // Handle audio step - collect parameters
+                    const templateId = document.getElementById('audio-template').value;
+                    const schema = parameterSchemas[templateId] || {};
+                    const parameters = {};
+                    
+                    for (const paramName of Object.keys(schema)) {
+                        const input = document.getElementById(`param-${paramName}`);
+                        if (input) {
+                            if (input.type === 'checkbox') {
+                                parameters[paramName] = input.checked;
+                            } else if (input.type === 'number') {
+                                parameters[paramName] = parseFloat(input.value) || 0;
+                            } else {
+                                parameters[paramName] = input.value;
+                            }
+                        }
+                    }
+                    
+                    stepData.parameters = parameters;
+                }
+
+                // Save the step
+                const stepResponse = await fetch(`/api/steps/${stepId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(stepData)
                 });
 
-                if (!response.ok) {
-                    const error = await response.json();
+                if (!stepResponse.ok) {
+                    const error = await stepResponse.json();
                     throw new Error(error.detail || 'Failed to save step');
                 }
 
@@ -1144,51 +1352,12 @@
             }
         });
 
-        document.getElementById('prompt-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
 
-            const filename = document.getElementById('prompt-filename').value;
-            const promptData = {
-                filename: filename,
-                description: document.getElementById('prompt-description').value || undefined,
-                content: document.getElementById('prompt-content').value
-            };
-
-            try {
-                const response = await fetch(`/api/prompts/${filename}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(promptData)
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to save prompt');
-                }
-
-                showSuccess('prompts', editingPrompt ? 'Prompt updated successfully' : 'Prompt created successfully');
-                closePromptModal();
-                loadPrompts();
-            } catch (error) {
-                console.error('Error saving prompt:', error);
-                showError('prompts', error.message);
-            }
-        });
 
         // Test functions
         async function testStep() {
-            const promptFile = document.getElementById('step-prompt-file').value;
-            if (!promptFile) {
-                alert('Please select a prompt file first');
-                return;
-            }
-
-            await testPromptByFilename(promptFile);
-        }
-
-        async function testPrompt() {
-            const content = document.getElementById('prompt-content').value;
-            if (!content.trim()) {
+            const promptContent = document.getElementById('step-prompt-content').value;
+            if (!promptContent.trim()) {
                 alert('Please enter prompt content first');
                 return;
             }
@@ -1198,7 +1367,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        prompt_content: content,
+                        prompt_content: promptContent,
                         test_transcript: 'This is a test transcript for prompt validation.'
                     })
                 });
@@ -1207,29 +1376,6 @@
                 
                 if (result.status === 'success') {
                     alert(`Prompt test successful!\n\nModel: ${result.model_used}\nResponse: ${result.ollama_response.substring(0, 200)}...`);
-                } else {
-                    alert(`Prompt test failed: ${result.error}`);
-                }
-            } catch (error) {
-                alert(`Test failed: ${error.message}`);
-            }
-        }
-
-        async function testPromptByFilename(filename) {
-            try {
-                const response = await fetch('/api/test-prompt', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        prompt_filename: filename,
-                        test_transcript: 'This is a test transcript for prompt validation.'
-                    })
-                });
-
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(`Prompt test successful!\n\nFile: ${filename}\nModel: ${result.model_used}\nResponse: ${result.ollama_response.substring(0, 200)}...`);
                 } else {
                     alert(`Prompt test failed: ${result.error}`);
                 }
@@ -1281,6 +1427,6 @@
             }
         });
     </script>
-    <script src="/static/sidebar.js"></script>
+    <script src="/static/sidebar.js?v=2.0"></script>
 </body>
 </html> 

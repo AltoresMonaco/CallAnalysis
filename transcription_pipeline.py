@@ -1,3 +1,4 @@
+# transcription_pipeline.py
 """
 Transcription Pipeline with Speaker Diarization
 Optimized for H100 GPU and offline operation
@@ -16,9 +17,9 @@ import numpy as np
 import librosa
 import soundfile as sf
 
-# Diarization
-from pyannote.audio import Pipeline
-from pyannote.core import Segment, Annotation
+# Diarization - TEMPORAIREMENT DÉSACTIVÉ pour test GPU
+# from pyannote.audio import Pipeline
+# from pyannote.core import Segment, Annotation
 
 # Whisper (existing faster-whisper integration)
 from whisper_wrapper import get_whisper_model
@@ -75,8 +76,9 @@ class TranscriptionPipeline:
             
             # For offline usage, we'll use a simpler approach that doesn't require HF token
             # This uses the segmentation + clustering approach
-            from pyannote.audio.pipelines import SpeakerDiarization
-            from pyannote.audio import Model
+            # TEMPORAIRE: Désactivé pour test GPU
+            # from pyannote.audio.pipelines import SpeakerDiarization
+            # from pyannote.audio import Model
             
             # Load segmentation model (can work offline)
             try:
@@ -215,28 +217,18 @@ class TranscriptionPipeline:
         return segments
     
     def _pyannote_diarization(self, audio: np.ndarray, sample_rate: int, task_id: str) -> List[Dict]:
-        """Use pyannote.audio for proper speaker diarization"""
-        # Save audio to temporary file for pyannote
+        """Use simple diarization pipeline (pyannote temporairement désactivé)"""
+        # Save audio to temporary file for diarization
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
             sf.write(tmp_file.name, audio, sample_rate)
             
-            # Run diarization
-            diarization = self.diarization_pipeline(tmp_file.name)
+            # Run simple diarization (returns list now, not Annotation)
+            segments = self.diarization_pipeline(tmp_file.name)
             
             # Clean up
             os.unlink(tmp_file.name)
         
-        # Convert pyannote output to our format
-        segments = []
-        for segment, _, speaker in diarization.itertracks(yield_label=True):
-            segments.append({
-                "start": segment.start,
-                "end": segment.end,
-                "speaker": speaker,
-                "duration": segment.duration
-            })
-        
-        logger.info(f"[{task_id}] Pyannote diarization found {len(segments)} speaker segments")
+        logger.info(f"[{task_id}] Simple diarization found {len(segments)} speaker segments")
         return segments
     
     def _transcribe_segments(self, audio_path: str, segments: List[Dict], 
@@ -333,8 +325,8 @@ class SimpleDiarizationPipeline:
         # Simple energy-based segmentation
         intervals = librosa.effects.split(audio, top_db=20)
         
-        # Create mock annotation object
-        annotation = Annotation()
+        # Create mock annotation object - TEMPORAIRE sans pyannote
+        segments = []
         speaker_id = 0
         
         for start_frame, end_frame in intervals:
@@ -342,14 +334,18 @@ class SimpleDiarizationPipeline:
             end_time = end_frame / sr
             
             if end_time - start_time >= self.config["min_segment_duration"]:
-                segment = Segment(start_time, end_time)
                 speaker = f"Speaker_{(speaker_id % 2) + 1}"
-                annotation[segment] = speaker
+                segments.append({
+                    "start": start_time,
+                    "end": end_time,
+                    "speaker": speaker,
+                    "duration": end_time - start_time
+                })
                 
-                if len(annotation) % 3 == 0:  # Change speaker occasionally
+                if len(segments) % 3 == 0:  # Change speaker occasionally
                     speaker_id += 1
         
-        return annotation
+        return segments  # Retourner liste au lieu d'Annotation
 
 
 # Global pipeline instance

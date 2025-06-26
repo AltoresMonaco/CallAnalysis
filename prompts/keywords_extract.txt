@@ -1,0 +1,16 @@
+À partir de la transcription ci-dessous d’un appel Monaco Telecom, extrayez des mots-clés logiques pertinents pour le reporting (sujets, thèmes, entités) dans notre contexte (offres, services, terminaux, etc.).
+
+**Instructions :**
+- Ne renvoyez **que** du JSON valide correspondant exactement à ce schéma :
+  ```json
+  {
+    "keywords": [
+      "string",
+      "string",
+      …
+    ]
+  }
+
+  Chaque mot-clé doit être un élément séparé de la liste.
+
+Aucune autre clé, commentaire ou texte additionnel ne doit être présent.

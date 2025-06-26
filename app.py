@@ -1,3 +1,4 @@
+# app.py
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -45,11 +46,24 @@ RESULTS_DIR.mkdir(exist_ok=True)
 class StepConfig(BaseModel):
     step_id: str
     name: str
-    prompt_file: str
+    step_type: str = "llm"  # "audio" or "llm"
+    prompt_file: Optional[str] = None  # Only for LLM steps
     enabled: bool = True
     order: int
     description: Optional[str] = None
     result_key: str  # Key to store result in task_state.results
+    input_source: str = "transcript"  # "transcript" or result_key of another step (e.g., "summary")
+    parameters: Optional[Dict[str, Any]] = None  # Step-specific parameters
+
+class AudioStepConfig(BaseModel):
+    step_id: str
+    name: str
+    step_type: str = "audio"
+    enabled: bool = True
+    order: int
+    description: Optional[str] = None
+    result_key: str
+    parameters: Dict[str, Any]  # Audio processing parameters
 
 class PromptData(BaseModel):
     filename: str
@@ -59,36 +73,144 @@ class PromptData(BaseModel):
 class StepsConfiguration(BaseModel):
     steps: Dict[str, StepConfig]
 
-# Default steps configuration
-DEFAULT_STEPS = {
+# Default audio processing steps
+DEFAULT_AUDIO_STEPS = {
+    "audio_loading": StepConfig(
+        step_id="audio_loading",
+        name="Audio Loading & Preprocessing",
+        step_type="audio",
+        enabled=True,
+        order=1,
+        description="Load and preprocess audio file",
+        result_key="audio_metadata",
+        input_source="file",
+        parameters={
+            "sample_rate": 16000,
+            "mono": True,
+            "normalize": True,
+            "trim_silence": False,
+            "trim_threshold_db": 20
+        }
+    ),
+    "language_detection": StepConfig(
+        step_id="language_detection",
+        name="Language Detection",
+        step_type="audio",
+        enabled=True,
+        order=2,
+        description="Detect dominant language in audio",
+        result_key="language_info",
+        input_source="audio_metadata",
+        parameters={
+            "detection_method": "sample",  # "sample" or "full"
+            "sample_duration": 30,
+            "sample_position": "middle",  # "start", "middle", "end"
+            "default_language": "fr",
+            "confidence_threshold": 0.7
+        }
+    ),
+    "diarization": StepConfig(
+        step_id="diarization",
+        name="Speaker Diarization",
+        step_type="audio",
+        enabled=True,
+        order=3,
+        description="Identify and segment speakers",
+        result_key="diarization_segments",
+        input_source="audio_metadata",
+        parameters={
+            "method": "vad",  # "pyannote", "vad", "disabled"
+            "min_segment_duration": 1.0,
+            "max_segment_duration": 30.0,
+            "silence_threshold": 3.0,
+            "merge_threshold": 1.0,
+            "vad_sensitivity": 12,  # top_db for VAD
+            "speaker_labels": {
+                "default_first": "conseiller",
+                "default_second": "client"
+            },
+            "max_speakers": 3,
+            # Enhanced pyannote speaker context parameters
+            "domain": "call_center",
+            "scenario": "customer_support", 
+            "expected_speakers": ["agent", "customer"],
+            "speaker_roles": {
+                "agent": ["conseiller", "support", "agent"],
+                "customer": ["client", "customer", "caller"]
+            },
+            "conversation_type": "telephone",
+            "language": "french",
+            "context_prompt": "Call center conversation between Monaco Telecom support agent and customer",
+            "min_speakers": 2,
+            "speaker_change_threshold": 0.5,
+            "min_speaker_duration": 2.0
+        }
+    ),
+    "transcription": StepConfig(
+        step_id="transcription",
+        name="Audio Transcription",
+        step_type="audio",
+        enabled=True,
+        order=4,
+        description="Convert speech to text",
+        result_key="transcript",
+        input_source="diarization_segments",
+        parameters={
+            "backend": "auto",  # "faster-whisper", "openai-whisper", "auto"
+            "model_size": "large-v3",
+            "use_gpu": True,
+            "compute_type": "float16",
+            "chunk_processing": True,
+            "chunk_size": 30,
+            "overlap": 5,
+            "force_language": None,  # None = use detected language
+            "initial_prompt": None,
+            "temperature": 0.0,
+            "best_of": 1,
+            "beam_size": 5
+        }
+    )
+}
+
+# Default LLM analysis steps (updated structure)
+DEFAULT_LLM_STEPS = {
     "qualification": StepConfig(
         step_id="qualification",
         name="Qualification Analysis",
+        step_type="llm",
         prompt_file="qualification.txt",
         enabled=True,
-        order=1,
+        order=5,
         description="Analyzes call qualification and satisfaction",
-        result_key="summary"
+        result_key="summary",
+        input_source="transcript"
     ),
     "critical_issues": StepConfig(
         step_id="critical_issues",
         name="Critical Issues Detection",
-        prompt_file="critical_issues.txt",
+        step_type="llm",
+        prompt_file="keywords_extract.txt",
         enabled=True,
-        order=2,
+        order=6,
         description="Identifies critical issues and concerns",
-        result_key="issues"
+        result_key="issues",
+        input_source="transcript"
     ),
     "categorisation": StepConfig(
         step_id="categorisation",
         name="Call Categorization",
+        step_type="llm",
         prompt_file="categorise.txt",
         enabled=True,
-        order=3,
+        order=7,
         description="Categorizes the call based on commercial and technical typologies",
-        result_key="categorisation"
+        result_key="categorisation",
+        input_source="summary"  # Use summary from qualification step
     )
 }
+
+# Combine all default steps
+DEFAULT_STEPS = {**DEFAULT_AUDIO_STEPS, **DEFAULT_LLM_STEPS}
 
 # Load or initialize steps configuration
 def load_steps_config() -> Dict[str, StepConfig]:
@@ -117,7 +239,7 @@ def save_steps_config(steps: Dict[str, StepConfig]):
     
     try:
         config_data = {
-            "steps": {step_id: step.dict() for step_id, step in steps.items()}
+            "steps": {step_id: step.model_dump() for step_id, step in steps.items()}
         }
         with open(config_file, 'w') as f:
             json.dump(config_data, f, indent=2)
@@ -131,9 +253,13 @@ STEPS_CONFIG = load_steps_config()
 
 @app.get("/")
 async def serve_index():
-    """Serve the main interface"""
-    with open("static/index.html", "r") as f:
-        return HTMLResponse(content=f.read())
+    """Serve the main reporting dashboard as the index page"""
+    return FileResponse("static/reporting.html")
+
+@app.get("/upload")
+async def serve_upload_page():
+    """Serve the upload/analysis page"""
+    return FileResponse("static/upload.html")
 
 @app.get("/ide")
 async def serve_ide():
@@ -334,10 +460,7 @@ def load_prompt(filename: str) -> str:
             detail=f"Error loading prompt file {prompt_path}: {str(e)}"
         )
 
-# Load prompts at startup
-PROMPT_QUALIFICATION = load_prompt("qualification.txt")
-PROMPT_CRITICAL_ISSUES = load_prompt("critical_issues.txt")
-PROMPT_CATEGORISE = load_prompt("categorise.txt")
+# Prompts are now loaded dynamically from the step configuration
 
 # ---- Functions ----
 
@@ -532,7 +655,8 @@ def query_ollama(prompt: str, transcript: str, task_id: str, step_name: str):
         payload = {
             "model": OLLAMA_MODEL,
             "prompt": f"{prompt.strip()}\n\n{transcript.strip()}",
-            "stream": False
+            "stream": False,
+            "keep_alive": -1  # Keep model cached indefinitely
         }
         
         logger.info(f"[{task_id}] Starting Ollama query for {step_name}")
@@ -825,21 +949,55 @@ async def test_ollama_connection():
 @app.get("/prompts")
 async def get_prompts():
     """Get current prompts for debugging/verification"""
-    return {
-        "qualification": PROMPT_QUALIFICATION[:200] + "..." if len(PROMPT_QUALIFICATION) > 200 else PROMPT_QUALIFICATION,
-        "critical_issues": PROMPT_CRITICAL_ISSUES[:200] + "..." if len(PROMPT_CRITICAL_ISSUES) > 200 else PROMPT_CRITICAL_ISSUES,
-        "categorise": PROMPT_CATEGORISE[:200] + "..." if len(PROMPT_CATEGORISE) > 200 else PROMPT_CATEGORISE
-    }
+    prompts = {}
+    try:
+        # Load prompts dynamically from current step configuration
+        for step_id, step_config in STEPS_CONFIG.items():
+            if step_config.enabled:
+                try:
+                    prompt_content = load_prompt(step_config.prompt_file)
+                    preview = prompt_content[:200] + "..." if len(prompt_content) > 200 else prompt_content
+                    prompts[step_id] = {
+                        "file": step_config.prompt_file,
+                        "preview": preview,
+                        "full_length": len(prompt_content)
+                    }
+                except Exception as e:
+                    prompts[step_id] = {
+                        "file": step_config.prompt_file,
+                        "error": f"Failed to load: {str(e)}"
+                    }
+        return prompts
+    except Exception as e:
+        return {"error": f"Failed to load prompts: {str(e)}"}
 
 @app.post("/reload-prompts")
 async def reload_prompts():
     """Reload prompts from files without restarting the server"""
-    global PROMPT_QUALIFICATION, PROMPT_CRITICAL_ISSUES, PROMPT_CATEGORISE
     try:
-        PROMPT_QUALIFICATION = load_prompt("qualification.txt")
-        PROMPT_CRITICAL_ISSUES = load_prompt("critical_issues.txt")
-        PROMPT_CATEGORISE = load_prompt("categorise.txt")
-        return {"message": "Prompts reloaded successfully"}
+        # Test loading all prompts from current step configuration
+        loaded_prompts = []
+        errors = []
+        
+        for step_id, step_config in STEPS_CONFIG.items():
+            if step_config.enabled:
+                try:
+                    load_prompt(step_config.prompt_file)  # Test load
+                    loaded_prompts.append(f"{step_id} ({step_config.prompt_file})")
+                except Exception as e:
+                    errors.append(f"{step_id} ({step_config.prompt_file}): {str(e)}")
+        
+        if errors:
+            return {
+                "message": "Some prompts failed to load",
+                "loaded": loaded_prompts,
+                "errors": errors
+            }
+        else:
+            return {
+                "message": "All prompts validated successfully",
+                "loaded": loaded_prompts
+            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reload prompts: {str(e)}")
 
@@ -860,6 +1018,24 @@ async def serve_manage_page():
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Management page not found")
+
+@app.get("/agent")
+async def serve_agent_page():
+    """Serve the agent dashboard page"""
+    try:
+        with open("static/agentpage.html", "r") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Agent page not found")
+
+@app.get("/reporting")
+async def serve_reporting_page():
+    """Serve the customer care intelligence dashboard page"""
+    try:
+        with open("static/reporting.html", "r") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Reporting page not found")
 
 @app.get("/api/saved-results")
 async def get_all_saved_results():
@@ -886,6 +1062,37 @@ async def get_saved_result_by_id(task_id: str):
         logger.error(f"Error loading result {task_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to load result")
 
+@app.put("/api/saved-results/{task_id}")
+async def update_saved_result(task_id: str, updated_result: dict):
+    """Update a saved result"""
+    try:
+        result_file = RESULTS_DIR / f"{task_id}.json"
+        if not result_file.exists():
+            raise HTTPException(status_code=404, detail="Result not found")
+        
+        # Validate the structure
+        required_fields = ["task_id", "filename", "status", "results"]
+        for field in required_fields:
+            if field not in updated_result:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+        
+        # Ensure task_id matches
+        if updated_result["task_id"] != task_id:
+            raise HTTPException(status_code=400, detail="Task ID mismatch")
+        
+        # Update the file
+        with open(result_file, 'w', encoding='utf-8') as f:
+            json.dump(updated_result, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Updated saved result: {task_id}")
+        return {"message": "Result updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating result {task_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update result")
+
 @app.delete("/api/saved-results/{task_id}")
 async def delete_saved_result(task_id: str):
     """Delete a saved result"""
@@ -911,7 +1118,7 @@ async def get_steps_configuration():
     try:
         steps_data = {}
         for step_id, step_config in STEPS_CONFIG.items():
-            steps_data[step_id] = step_config.dict()
+            steps_data[step_id] = step_config.model_dump()
         return {
             "steps": steps_data,
             "count": len(steps_data)
@@ -951,27 +1158,45 @@ async def update_steps_configuration(config: StepsConfiguration):
 
 @app.post("/api/steps/{step_id}")
 async def create_or_update_step(step_id: str, step_config: StepConfig):
-    """Create or update a specific step"""
+    """Create or update a specific step (audio or LLM)"""
     global STEPS_CONFIG
     try:
-        # Validate prompt file exists
-        prompt_path = Path("prompts") / step_config.prompt_file
-        if not prompt_path.exists():
+        # Validate input source dependencies
+        validate_input_source_dependencies(step_config, STEPS_CONFIG, step_id)
+        
+        # Validate based on step type
+        if step_config.step_type == "llm":
+            # Validate prompt file exists for LLM steps
+            if not step_config.prompt_file:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="LLM steps require a prompt file"
+                )
+            prompt_path = Path("prompts") / step_config.prompt_file
+            if not prompt_path.exists():
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Prompt file not found: {step_config.prompt_file}"
+                )
+        elif step_config.step_type == "audio":
+            # Audio steps don't need prompt files but may need parameter validation
+            if not step_config.parameters:
+                # Set default parameters based on step type
+                step_config.parameters = get_default_audio_parameters(step_id)
+        else:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Prompt file not found: {step_config.prompt_file}"
+                status_code=400,
+                detail=f"Unknown step type: {step_config.step_type}"
             )
         
         # Ensure step_id matches
         step_config.step_id = step_id
         
-        # Note: No order conflict validation - multiple steps can have the same order (parallel processing)
-        
         # Update configuration
         STEPS_CONFIG[step_id] = step_config
         save_steps_config(STEPS_CONFIG)
         
-        logger.info(f"Step '{step_id}' created/updated successfully (order: {step_config.order})")
+        logger.info(f"Step '{step_id}' ({step_config.step_type}) created/updated successfully (order: {step_config.order})")
         return {"message": f"Step '{step_id}' created/updated successfully"}
         
     except HTTPException:
@@ -979,6 +1204,102 @@ async def create_or_update_step(step_id: str, step_config: StepConfig):
     except Exception as e:
         logger.error(f"Error creating/updating step {step_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to create/update step")
+
+def validate_input_source_dependencies(step_config: StepConfig, current_steps: Dict[str, StepConfig], exclude_step_id: str = None):
+    """Validate that the input source is available from previous steps"""
+    if step_config.input_source == "transcript":
+        # Check if transcript is available from an audio transcription step in a previous order
+        available_steps = [
+            step for step_id, step in current_steps.items() 
+            if step_id != exclude_step_id and step.order < step_config.order and step.enabled
+        ]
+        
+        has_transcript_step = any(
+            step.step_type == "audio" and step.result_key == "transcript"
+            for step in available_steps
+        )
+        
+        if not has_transcript_step:
+            raise HTTPException(
+                status_code=400,
+                detail="Input source 'transcript' requires an enabled audio transcription step in a previous order that produces the transcript result"
+            )
+    
+    elif step_config.input_source != "file":  # "file" is valid for first audio step
+        # Check if the input source result key is available from previous steps
+        available_steps = [
+            step for step_id, step in current_steps.items() 
+            if step_id != exclude_step_id and step.order < step_config.order and step.enabled
+        ]
+        
+        available_result_keys = [step.result_key for step in available_steps]
+        
+        if step_config.input_source not in available_result_keys:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Input source '{step_config.input_source}' is not available. Available sources from previous steps: {available_result_keys + (['transcript'] if any(s.step_type == 'audio' and s.result_key == 'transcript' for s in available_steps) else [])}"
+            )
+
+def get_default_audio_parameters(step_id: str) -> Dict[str, Any]:
+    """Get default parameters for audio steps"""
+    defaults = {
+        "audio_loading": {
+            "sample_rate": 16000,
+            "mono": True,
+            "normalize": True,
+            "trim_silence": False,
+            "trim_threshold_db": 20
+        },
+        "language_detection": {
+            "detection_method": "sample",
+            "sample_duration": 30,
+            "sample_position": "middle",
+            "default_language": "fr",
+            "confidence_threshold": 0.7
+        },
+        "diarization": {
+            "method": "vad",
+            "min_segment_duration": 1.0,
+            "max_segment_duration": 30.0,
+            "silence_threshold": 3.0,
+            "merge_threshold": 1.0,
+            "vad_sensitivity": 12,
+            "speaker_labels": {
+                "default_first": "conseiller",
+                "default_second": "client"
+            },
+            "max_speakers": 3,
+            # Enhanced pyannote speaker context parameters
+            "domain": "call_center",
+            "scenario": "customer_support", 
+            "expected_speakers": ["agent", "customer"],
+            "speaker_roles": {
+                "agent": ["conseiller", "support", "agent"],
+                "customer": ["client", "customer", "caller"]
+            },
+            "conversation_type": "telephone",
+            "language": "french",
+            "context_prompt": "Call center conversation between Monaco Telecom support agent and customer",
+            "min_speakers": 2,
+            "speaker_change_threshold": 0.5,
+            "min_speaker_duration": 2.0
+        },
+        "transcription": {
+            "backend": "auto",
+            "model_size": "large-v3",
+            "use_gpu": True,
+            "compute_type": "float16",
+            "chunk_processing": True,
+            "chunk_size": 30,
+            "overlap": 5,
+            "initial_prompt": "",
+            "force_language": None,
+            "temperature": 0.0,
+            "best_of": 1,
+            "beam_size": 5
+        }
+    }
+    return defaults.get(step_id, {})
 
 @app.delete("/api/steps/{step_id}")
 async def delete_step(step_id: str):
@@ -1140,7 +1461,8 @@ async def test_prompt(
                     json={
                         "model": OLLAMA_MODEL,
                         "prompt": f"{prompt_content.strip()}\n\n{test_transcript.strip()}",
-                        "stream": False
+                        "stream": False,
+                        "keep_alive": -1  # Keep model cached
                     }, 
                     timeout=60
                 ).json()
@@ -1169,32 +1491,258 @@ async def test_prompt(
         logger.error(f"Error testing prompt: {e}")
         raise HTTPException(status_code=500, detail="Failed to test prompt")
 
+@app.get("/api/audio-step-templates")
+async def get_audio_step_templates():
+    """Get available audio step templates for creating new steps"""
+    templates = {
+        "audio_loading": {
+            "name": "Audio Loading & Preprocessing",
+            "description": "Load and preprocess audio file",
+            "parameters": get_default_audio_parameters("audio_loading"),
+            "result_key": "audio_metadata",
+            "input_source": "file"
+        },
+        "language_detection": {
+            "name": "Language Detection",
+            "description": "Detect dominant language in audio",
+            "parameters": get_default_audio_parameters("language_detection"),
+            "result_key": "language_info",
+            "input_source": "audio_metadata"
+        },
+        "diarization": {
+            "name": "Speaker Diarization",
+            "description": "Identify and segment speakers",
+            "parameters": get_default_audio_parameters("diarization"),
+            "result_key": "diarization_segments",
+            "input_source": "audio_metadata"
+        },
+        "transcription": {
+            "name": "Audio Transcription",
+            "description": "Convert speech to text",
+            "parameters": get_default_audio_parameters("transcription"),
+            "result_key": "transcript",
+            "input_source": "diarization_segments"
+        },
+        "audio_transcription": {
+            "name": "Audio Transcription",
+            "description": "Convert speech to text",
+            "parameters": get_default_audio_parameters("transcription"),
+            "result_key": "transcript",
+            "input_source": "diarization_segments"
+        }
+    }
+    return {"templates": templates}
+
+@app.get("/api/parameter-schemas")
+async def get_parameter_schemas():
+    """Get parameter schemas for different step types"""
+    schemas = {
+        "audio_loading": {
+            "sample_rate": {"type": "number", "default": 16000, "description": "Target sample rate in Hz"},
+            "mono": {"type": "boolean", "default": True, "description": "Convert to mono audio"},
+            "normalize": {"type": "boolean", "default": True, "description": "Normalize audio volume"},
+            "trim_silence": {"type": "boolean", "default": False, "description": "Trim silence from start/end"},
+            "trim_threshold_db": {"type": "number", "default": 20, "description": "Silence threshold in dB"}
+        },
+        "language_detection": {
+            "detection_method": {"type": "select", "options": ["sample", "full"], "default": "sample", "description": "Detection method"},
+            "sample_duration": {"type": "number", "default": 30, "description": "Sample duration in seconds"},
+            "sample_position": {"type": "select", "options": ["start", "middle", "end"], "default": "middle", "description": "Sample position"},
+            "default_language": {"type": "text", "default": "fr", "description": "Default language code"},
+            "confidence_threshold": {"type": "number", "min": 0, "max": 1, "step": 0.1, "default": 0.7, "description": "Confidence threshold"}
+        },
+        "diarization": {
+            "method": {"type": "select", "options": ["vad", "pyannote", "disabled"], "default": "vad", "description": "Diarization method"},
+            "min_segment_duration": {"type": "number", "default": 1.0, "description": "Minimum segment duration in seconds"},
+            "max_segment_duration": {"type": "number", "default": 30.0, "description": "Maximum segment duration in seconds"},
+            "silence_threshold": {"type": "number", "default": 3.0, "description": "Silence threshold for speaker change in seconds"},
+            "merge_threshold": {"type": "number", "default": 1.0, "description": "Threshold for merging close segments in seconds"},
+            "vad_sensitivity": {"type": "number", "default": 12, "description": "VAD sensitivity (top_db)"},
+            "max_speakers": {"type": "number", "default": 3, "description": "Maximum number of speakers"},
+            "min_speakers": {"type": "number", "default": 2, "description": "Minimum number of speakers (pyannote)"},
+            "min_speaker_duration": {"type": "number", "default": 2.0, "description": "Minimum speaker duration in seconds (pyannote)"},
+            "speaker_change_threshold": {"type": "number", "min": 0, "max": 1, "step": 0.1, "default": 0.5, "description": "Speaker change confidence threshold (pyannote)"},
+            "domain": {"type": "select", "options": ["call_center", "meeting", "interview", "general"], "default": "call_center", "description": "Conversation domain context"},
+            "scenario": {"type": "select", "options": ["customer_support", "sales", "technical_support", "general"], "default": "customer_support", "description": "Conversation scenario"},
+            "conversation_type": {"type": "select", "options": ["telephone", "video_call", "in_person", "webinar"], "default": "telephone", "description": "Type of conversation"},
+            "language": {"type": "select", "options": ["french", "english", "spanish", "italian"], "default": "french", "description": "Primary conversation language"},
+            "context_prompt": {"type": "textarea", "default": "Call center conversation between Monaco Telecom support agent and customer", "description": "Context description for better speaker identification"},
+            "expected_speakers": {"type": "text", "default": "agent,customer", "description": "Expected speaker roles (comma-separated)"}
+        },
+        "transcription": {
+            "backend": {"type": "select", "options": ["auto", "faster-whisper", "openai-whisper"], "default": "auto", "description": "Transcription backend"},
+            "model_size": {"type": "select", "options": ["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"], "default": "large-v3", "description": "Model size"},
+            "use_gpu": {"type": "boolean", "default": True, "description": "Use GPU acceleration"},
+            "compute_type": {"type": "select", "options": ["float16", "float32", "int8"], "default": "float16", "description": "Compute precision"},
+            "chunk_processing": {"type": "boolean", "default": True, "description": "Process in chunks"},
+            "chunk_size": {"type": "number", "default": 30, "description": "Chunk size in seconds"},
+            "overlap": {"type": "number", "default": 5, "description": "Chunk overlap in seconds"},
+            "initial_prompt": {"type": "textarea", "default": "", "description": "Context prompt to guide transcription (e.g., 'The following is a call center conversation about insurance claims.')"},
+            "force_language": {"type": "text", "default": "", "description": "Force specific language (leave empty for auto-detection)"},
+            "temperature": {"type": "number", "min": 0, "max": 1, "step": 0.1, "default": 0.0, "description": "Temperature for sampling"},
+            "best_of": {"type": "number", "default": 1, "description": "Number of candidates to generate"},
+            "beam_size": {"type": "number", "default": 5, "description": "Beam size for decoding"}
+        }
+    }
+    return {"schemas": schemas}
+
+@app.get("/api/available-input-sources")
+async def get_available_input_sources(order: int = None):
+    """Get available input sources for a given step order"""
+    try:
+        if order is None:
+            return {"input_sources": []}
+        
+        # Get steps with lower order numbers that are enabled
+        available_steps = [
+            step for step in STEPS_CONFIG.values() 
+            if step.order < order and step.enabled
+        ]
+        
+        input_sources = []
+        
+        # Check if transcript is available from audio transcription step
+        has_transcript_step = any(
+            step.step_type == "audio" and step.result_key == "transcript"
+            for step in available_steps
+        )
+        
+        if has_transcript_step:
+            input_sources.append({
+                "value": "transcript",
+                "label": "Full Transcript (from audio transcription)",
+                "type": "transcript"
+            })
+        
+        # Add other result keys from previous steps
+        for step in available_steps:
+            if step.result_key and step.result_key != "transcript":
+                input_sources.append({
+                    "value": step.result_key,
+                    "label": f"{step.name} Result ({step.result_key}) - Order {step.order}",
+                    "type": "step_result",
+                    "source_step": step.step_id,
+                    "source_order": step.order
+                })
+        
+        # Add "file" option for first audio steps (order 1)
+        if order == 1:
+            input_sources.insert(0, {
+                "value": "file",
+                "label": "Audio File (direct input)",
+                "type": "file"
+            })
+        
+        return {"input_sources": input_sources}
+        
+    except Exception as e:
+        logger.error(f"Error getting available input sources: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get available input sources")
+
+def get_step_input_text(step_config: StepConfig, task_state: TaskState, transcript: str, task_id: str) -> str:
+    """Determine the input text for a step based on its configuration"""
+    if step_config.input_source == "transcript":
+        logger.info(f"[{task_id}] Step {step_config.step_id} using full transcript ({len(transcript)} characters)")
+        return transcript
+    
+    # Try to get the result from the specified input source
+    source_result = task_state.results.get(step_config.input_source)
+    
+    if source_result:
+        # Handle different result formats
+        if isinstance(source_result, dict):
+            # Extract text from result object - try common keys
+            result_text = (
+                source_result.get("response", "") or 
+                source_result.get("summary", "") or 
+                source_result.get("text", "") or 
+                str(source_result)
+            )
+        elif isinstance(source_result, str):
+            result_text = source_result
+        else:
+            result_text = str(source_result)
+        
+        if result_text and len(result_text.strip()) > 50:  # Minimum reasonable length
+            logger.info(f"[{task_id}] Step {step_config.step_id} using {step_config.input_source} result ({len(result_text)} characters)")
+            return result_text
+    
+    # Fallback to transcript if the source is not available or too short
+    logger.warning(f"[{task_id}] Step {step_config.step_id} falling back to full transcript - {step_config.input_source} not available or too short")
+    return transcript
+
 def process_audio_task(temp_file_path: str, task_id: str, filename: str):
-    """Process audio file with sequential-parallel steps based on order"""
+    """Process audio file with modular step-based pipeline"""
     try:
         # Get the task state
         task_state = get_task_state(task_id)
         
-        # Step 1: Transcribe audio (if transcription step exists)
-        if "transcription" in task_state.steps:
-            logger.info(f"[{task_id}] Starting transcription for {filename}")
-            transcript = transcribe_audio(temp_file_path, task_id)
+        # Step 1: Process audio steps (loading, language detection, diarization, transcription)
+        audio_steps = {k: v for k, v in STEPS_CONFIG.items() if v.step_type == "audio" and v.enabled}
+        if audio_steps:
+            logger.info(f"[{task_id}] Starting audio processing pipeline with {len(audio_steps)} steps")
+            
+            # Create AudioProcessor with current steps configuration
+            from whisper_wrapper import AudioProcessor
+            steps_config_dict = {k: v.model_dump() for k, v in STEPS_CONFIG.items()}
+            audio_processor = AudioProcessor(steps_config_dict)
+            
+            # Process through audio steps
+            audio_results = audio_processor.process_audio_steps(temp_file_path, task_id, update_task_step)
+            
+            # Extract transcript from results - handle different result key formats
+            transcript = None
+            transcript_data = None
+            
+            # Look for transcript in audio_results using the configured result key
+            for step_id, step_config in audio_steps.items():
+                if step_config.result_key == "transcript":
+                    transcript_data = audio_results.get(step_config.result_key)
+                    break
+            
+            # If not found, try the generic "transcript" key
+            if not transcript_data:
+                transcript_data = audio_results.get("transcript")
+            
+            if transcript_data:
+                if isinstance(transcript_data, dict):
+                    transcript = transcript_data.get("text", transcript_data.get("transcript", ""))
+                elif isinstance(transcript_data, str):
+                    transcript = transcript_data
+                else:
+                    transcript = str(transcript_data)
+                
+                # Store additional audio processing results
+                task_state.results.update({
+                    "audio_metadata": audio_results.get("audio_metadata"),
+                    "language_info": audio_results.get("language_info"), 
+                    "diarization_segments": audio_results.get("diarization_segments"),
+                    "transcript": transcript,  # Ensure transcript is stored with standard key
+                    "transcript_metadata": transcript_data.get("metadata", {}) if isinstance(transcript_data, dict) else {}
+                })
+                
+                logger.info(f"[{task_id}] Audio processing completed - transcript length: {len(transcript)} characters")
+            else:
+                logger.error(f"[{task_id}] No transcript produced from audio processing")
+                logger.error(f"[{task_id}] Available audio_results keys: {list(audio_results.keys())}")
+                return
         else:
-            logger.warning(f"[{task_id}] No transcription step configured")
-            return
+            # Fallback to legacy transcription
+            logger.warning(f"[{task_id}] No audio steps configured, using legacy transcription")
+            transcript = transcribe_audio(temp_file_path, task_id)
         
-        # Step 2: Run enabled LLM analyses in order groups
-        enabled_steps = {k: v for k, v in STEPS_CONFIG.items() if v.enabled}
-        if not enabled_steps:
-            logger.info(f"[{task_id}] No analysis steps enabled, completing task")
+        # Step 2: Run enabled LLM analyses in order groups (exclude audio steps)
+        llm_steps = {k: v for k, v in STEPS_CONFIG.items() if v.enabled and v.step_type == "llm"}
+        if not llm_steps:
+            logger.info(f"[{task_id}] No LLM analysis steps enabled, completing task")
             task_state.status = "completed"
             task_state.updated_at = datetime.now().isoformat()
             save_completed_task(task_state)
             return
         
-        # Group steps by order
+        # Group LLM steps by order
         order_groups = {}
-        for step_id, step_config in enabled_steps.items():
+        for step_id, step_config in llm_steps.items():
             order = step_config.order
             if order not in order_groups:
                 order_groups[order] = []
@@ -1202,12 +1750,12 @@ def process_audio_task(temp_file_path: str, task_id: str, filename: str):
         
         # Sort orders to process sequentially
         sorted_orders = sorted(order_groups.keys())
-        logger.info(f"[{task_id}] Processing {len(enabled_steps)} steps in {len(sorted_orders)} order groups: {sorted_orders}")
+        logger.info(f"[{task_id}] Processing {len(llm_steps)} LLM steps in {len(sorted_orders)} order groups: {sorted_orders}")
         
         # Process each order group sequentially
         for order in sorted_orders:
             steps_in_order = order_groups[order]
-            logger.info(f"[{task_id}] Processing order {order} with {len(steps_in_order)} steps: {[s[0] for s in steps_in_order]}")
+            logger.info(f"[{task_id}] Processing order {order} with {len(steps_in_order)} LLM steps: {[s[0] for s in steps_in_order]}")
             
             # Run all steps in this order group in parallel
             with ThreadPoolExecutor(max_workers=len(steps_in_order)) as executor:
@@ -1215,11 +1763,21 @@ def process_audio_task(temp_file_path: str, task_id: str, filename: str):
                 
                 for step_id, step_config in steps_in_order:
                     try:
+                        # Skip audio steps (they were already processed)
+                        if step_config.step_type == "audio":
+                            logger.info(f"[{task_id}] Skipping audio step {step_id} - already processed")
+                            continue
+                            
+                        # Determine input text for this specific step based on its configuration
+                        input_text = get_step_input_text(step_config, task_state, transcript, task_id)
+                        
                         # Load prompt dynamically
                         prompt = load_prompt(step_config.prompt_file)
-                        future = executor.submit(query_ollama, prompt, transcript, task_id, step_id)
+                        future = executor.submit(query_ollama, prompt, input_text, task_id, step_id)
                         futures[step_id] = future
-                        logger.info(f"[{task_id}] Submitted {step_id} (order {order}) for processing")
+                        
+                        source_description = step_config.input_source if step_config.input_source != "transcript" else "transcript"
+                        logger.info(f"[{task_id}] Submitted {step_id} (order {order}) for processing with {source_description} ({len(input_text)} characters)")
                     except Exception as e:
                         logger.error(f"[{task_id}] Failed to submit {step_id}: {e}")
                         update_task_step(task_id, step_id, "error", 0, f"Failed to start: {str(e)}")

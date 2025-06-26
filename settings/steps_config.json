@@ -1,0 +1,143 @@
+{
+  "steps": {
+    "audio_loading": {
+      "step_id": "audio_loading",
+      "name": "Audio Loading & Preprocessing",
+      "step_type": "audio",
+      "prompt_file": null,
+      "enabled": true,
+      "order": 1,
+      "description": "Load and preprocess audio file",
+      "result_key": "audio_metadata",
+      "input_source": "file",
+      "parameters": {
+        "sample_rate": 16000,
+        "mono": true,
+        "normalize": true,
+        "trim_silence": false,
+        "trim_threshold_db": 20
+      }
+    },
+    "speaker_diarization": {
+      "step_id": "speaker_diarization",
+      "name": "Speaker Diarization",
+      "step_type": "audio",
+      "prompt_file": null,
+      "enabled": true,
+      "order": 2,
+      "description": "Identify and segment speakers using VAD with context",
+      "result_key": "diarization_segments",
+      "input_source": "audio_metadata",
+      "parameters": {
+        "method": "vad",
+        "min_segment_duration": 1.0,
+        "max_segment_duration": 30.0,
+        "silence_threshold": 3.0,
+        "merge_threshold": 1.0,
+        "vad_sensitivity": 12,
+        "speaker_labels": {
+          "default_first": "conseiller",
+          "default_second": "client"
+        },
+        "max_speakers": 3,
+        "min_speakers": 2,
+        "min_speaker_duration": 2.0,
+        "speaker_change_threshold": 0.5,
+        "domain": "call_center",
+        "scenario": "customer_support",
+        "expected_speakers": [
+          "agent",
+          "customer"
+        ],
+        "speaker_roles": {
+          "agent": [
+            "conseiller",
+            "support",
+            "agent"
+          ],
+          "customer": [
+            "client",
+            "customer",
+            "caller"
+          ]
+        },
+        "conversation_type": "telephone",
+        "language": "french",
+        "context_prompt": "Call center conversation between Monaco Telecom support agent and customer about technical support, billing, or service issues"
+      }
+    },
+    "audio_transcription": {
+      "step_id": "audio_transcription",
+      "name": "Audio Transcription",
+      "step_type": "audio",
+      "prompt_file": null,
+      "enabled": true,
+      "order": 3,
+      "description": "Convert speech to text with speaker context",
+      "result_key": "transcript",
+      "input_source": "diarization_segments",
+      "parameters": {
+        "backend": "auto",
+        "model_size": "large-v3",
+        "use_gpu": true,
+        "compute_type": "float16",
+        "chunk_processing": true,
+        "chunk_size": 30,
+        "overlap": 5,
+        "initial_prompt": "The following is a French call center conversation between a Monaco Telecom support agent and a customer. The conversation includes technical terms related to telecommunications, internet services, and customer support.",
+        "force_language": "",
+        "temperature": 0.0,
+        "best_of": 1,
+        "beam_size": 5
+      }
+    },
+    "qualification": {
+      "step_id": "qualification",
+      "name": "Call Qualification & Summary",
+      "step_type": "llm",
+      "prompt_file": "qualification.txt",
+      "enabled": true,
+      "order": 4,
+      "description": "Analyze call quality, satisfaction and create summary",
+      "result_key": "summary",
+      "input_source": "transcript",
+      "parameters": null
+    },
+    "keywords_extract": {
+      "step_id": "keywords_extract",
+      "name": "Keywords & Issues Extraction",
+      "step_type": "llm",
+      "prompt_file": "keywords_extract.txt",
+      "enabled": true,
+      "order": 6,
+      "description": "Extract critical issues and keywords from conversation",
+      "result_key": "issues",
+      "input_source": "transcript",
+      "parameters": null
+    },
+    "agent_review": {
+      "step_id": "agent_review",
+      "name": "Agent Performance Review",
+      "step_type": "llm",
+      "prompt_file": "agent_review.txt",
+      "enabled": true,
+      "order": 7,
+      "description": "Evaluate agent performance and communication quality",
+      "result_key": "agent_performance",
+      "input_source": "transcript",
+      "parameters": null
+    },
+    "categorisation": {
+      "step_id": "categorisation",
+      "name": "Call Categorization",
+      "step_type": "llm",
+      "prompt_file": "categorise.txt",
+      "enabled": true,
+      "order": 5,
+      "description": "Categorize call based on commercial and technical typologies",
+      "result_key": "categorisation",
+      "input_source": "summary",
+      "parameters": null
+    }
+  }
+}

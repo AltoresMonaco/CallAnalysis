@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saved Results - Audio Transcript Analysis</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="/static/sidebar.css" rel="stylesheet">
+    <link href="/static/sidebar.css?v=2.0" rel="stylesheet">
     <script src="/static/utils.js"></script>
     <style>
         * {
@@ -204,99 +204,7 @@
             color: #dee2e9;
         }
 
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 1, 0.5);
-            backdrop-filter: blur(5px);
-        }
 
-        .modal-content {
-            background: white;
-            margin: 2% auto;
-            padding: 0;
-            border-radius: 20px;
-            width: 95%;
-            max-width: 900px;
-            max-height: 90vh;
-            box-shadow: 0 20px 40px rgba(39, 59, 239, 0.3);
-            animation: modalSlideIn 0.3s ease-out;
-            border: 1px solid #dee2e9;
-            overflow: hidden;
-        }
-
-        .modal-header {
-            background: #e8e7ff;
-            padding: 1.5rem;
-            border-bottom: 1px solid #dee2e9;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            color: #273BEF;
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .close {
-            color: #000001;
-            opacity: 0.7;
-            font-size: 1.5rem;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
-
-        .close:hover {
-            color: #273BEF;
-            opacity: 1;
-        }
-
-        .modal-body {
-            padding: 2rem;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-
-        .result-section {
-            background: #f8f9fa;
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            border: 1px solid #dee2e9;
-        }
-
-        .result-section-title {
-            color: #273BEF;
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .result-content {
-            background: white;
-            border-radius: 12px;
-            padding: 1rem;
-            color: #000001;
-            line-height: 1.6;
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 0.9rem;
-            white-space: pre-wrap;
-            border: 1px solid #dee2e9;
-            max-height: 300px;
-            overflow-y: auto;
-        }
 
         @keyframes fadeInUp {
             from {
@@ -314,16 +222,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        @keyframes modalSlideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+
 
         @media (max-width: 768px) {
             .container {
@@ -342,11 +241,6 @@
                 flex-direction: column;
                 gap: 1rem;
             }
-
-            .modal-content {
-                width: 98%;
-                margin: 1% auto;
-            }
         }
     </style>
 </head>
@@ -354,7 +248,17 @@
     <div class="container">
         <div class="header">
             <img src="/static/logo.png" alt="Logo" class="logo">
-            <p>Saved Analysis Results</p>
+            <div>
+                <p>Saved Analysis Results</p>
+                <div style="text-align: center; margin-top: 1rem;">
+                    <a href="/" style="color: #273BEF; text-decoration: none; font-weight: 500; margin-right: 1rem;">
+                        <i class="fas fa-chart-line"></i> Back to Dashboard
+                    </a>
+                    <a href="/agent" style="color: #273BEF; text-decoration: none; font-weight: 500;">
+                        <i class="fas fa-user-cog"></i> Switch to Agent Dashboard for advanced editing
+                    </a>
+                </div>
+            </div>
         </div>
 
         <div class="main-card">
@@ -383,25 +287,17 @@
         </div>
     </div>
 
-    <!-- Result Detail Modal -->
-    <div id="resultModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title" id="modalTitle">Result Details</h2>
-                <span class="close" onclick="closeModal()">&times;</span>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Result details will be loaded here -->
-            </div>
-        </div>
-    </div>
+
 
     <script>
         let savedResults = [];
 
         // Load results on page load
         window.addEventListener('load', function() {
-            Sidebar.init();
+            // Initialize the modern sidebar
+            if (window.Sidebar) {
+                Sidebar.init();
+            }
             loadResults();
         });
 
@@ -517,69 +413,9 @@
             }
         }
 
-        async function viewResult(taskId) {
-            try {
-                const result = await API.get(`/api/saved-results/${taskId}`);
-                
-                document.getElementById('modalTitle').textContent = result.filename;
-                
-                let modalContent = '';
-                
-                // Transcript section
-                if (result.results.transcript) {
-                    modalContent += `
-                        <div class="result-section">
-                            <div class="result-section-title">
-                                <i class="fas fa-file-alt"></i> Transcript
-                            </div>
-                            <div class="result-content">${result.results.transcript}</div>
-                        </div>
-                    `;
-                }
-                
-                // Summary section
-                if (result.results.summary) {
-                    modalContent += `
-                        <div class="result-section">
-                            <div class="result-section-title">
-                                <i class="fas fa-chart-line"></i> Call Qualification & Summary
-                            </div>
-                            <div class="result-content">${JSON.stringify(result.results.summary, null, 2)}</div>
-                        </div>
-                    `;
-                }
-                
-                // Issues section
-                if (result.results.issues) {
-                    modalContent += `
-                        <div class="result-section">
-                            <div class="result-section-title">
-                                <i class="fas fa-exclamation-triangle"></i> Critical Issues
-                            </div>
-                            <div class="result-content">${JSON.stringify(result.results.issues, null, 2)}</div>
-                        </div>
-                    `;
-                }
-                
-                // Categorisation section
-                if (result.results.categorisation) {
-                    modalContent += `
-                        <div class="result-section">
-                            <div class="result-section-title">
-                                <i class="fas fa-tags"></i> Categorisation
-                            </div>
-                            <div class="result-content">${JSON.stringify(result.results.categorisation, null, 2)}</div>
-                        </div>
-                    `;
-                }
-                
-                document.getElementById('modalBody').innerHTML = modalContent;
-                document.getElementById('resultModal').style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error loading result details:', error);
-                alert('Failed to load result details');
-            }
+        function viewResult(taskId) {
+            // Redirect to agent page with task ID parameter
+            window.location.href = `/agent?taskId=${taskId}`;
         }
 
         async function deleteResult(taskId) {
@@ -616,21 +452,11 @@
             }
         }
 
-        function closeModal() {
-            document.getElementById('resultModal').style.display = 'none';
-        }
 
-        // Close modal when clicking outside
-        window.addEventListener('click', function(event) {
-            const modal = document.getElementById('resultModal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
 
         // === SIDEBAR EVENT HANDLERS ===
         // Handled by shared Sidebar utility in utils.js
     </script>
-    <script src="/static/sidebar.js"></script>
+    <script src="/static/sidebar.js?v=2.0"></script>
 </body>
 </html> 

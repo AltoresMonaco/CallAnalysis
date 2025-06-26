@@ -1,4 +1,4 @@
 {
   "ollama_url": "http://localhost:11434/api/generate",
-  "ollama_model": "llama3.1:latest"
+  "ollama_model": "lucifers/Polaris-4B-Preview.Q8_0"
 }

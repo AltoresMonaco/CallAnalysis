@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Dashboard - Audio Transcript Analysis</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/sidebar.css?v=2.0" rel="stylesheet">
+    <script src="/static/utils.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1rem;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 0.75rem 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            height: 40px;
+            width: auto;
+        }
+
+        .page-title {
+            color: #273BEF;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            background: #273BEF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: #1e2fcf;
+            transform: translateY(-1px);
+        }
+
+        .btn.secondary {
+            background: white;
+            color: #273BEF;
+            border: 1px solid #273BEF;
+        }
+
+        .btn.secondary:hover {
+            background: #e8e7ff;
+        }
+
+        .btn.success {
+            background: #10b981;
+        }
+
+        .btn.success:hover {
+            background: #059669;
+        }
+
+        .btn.danger {
+            background: #ef4444;
+        }
+
+        .btn.danger:hover {
+            background: #dc2626;
+        }
+
+        /* Floating Save Button */
+        .floating-save-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 1rem 1.5rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            text-decoration: none;
+            transform: scale(0.9);
+        }
+
+        .floating-save-btn.show {
+            display: flex;
+            transform: scale(1);
+        }
+
+        .floating-save-btn:hover {
+            background: #059669;
+            transform: scale(1.05);
+            box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
+        }
+
+        .floating-save-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Single Result View */
+        .result-detail {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(39, 59, 239, 0.1);
+            border: 1px solid #dee2e9;
+            overflow: hidden;
+        }
+
+        .result-header {
+            background: linear-gradient(135deg, #273BEF 0%, #1e2fcf 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            position: relative;
+        }
+
+        .result-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            word-break: break-word;
+        }
+
+        .result-meta {
+            opacity: 0.9;
+            font-size: 0.8rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .result-body {
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .result-body .field-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Dynamic Field Components */
+        .field-group {
+            margin-bottom: 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e9;
+            overflow: hidden;
+        }
+
+        .field-header {
+            background: #e8e7ff;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .field-header.collapsible:hover {
+            background: #ddd6ff;
+        }
+
+        .field-title {
+            color: #273BEF;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .collapse-icon {
+            margin-left: auto;
+            transition: transform 0.3s ease;
+            color: #273BEF;
+            font-size: 0.8rem;
+        }
+
+        .collapse-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .field-content.collapsible {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 0.75rem;
+        }
+
+        .field-content.collapsible.expanded {
+            max-height: 1000px;
+            padding: 0.75rem;
+        }
+
+        .field-content {
+            padding: 0.75rem;
+            background: white;
+        }
+
+        /* Text Field */
+        .text-field {
+            width: 100%;
+            border: 1px solid #dee2e9;
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .text-field.large {
+            min-height: 120px;
+        }
+
+        .text-field:focus {
+            outline: none;
+            border-color: #273BEF;
+            box-shadow: 0 0 0 3px rgba(39, 59, 239, 0.1);
+        }
+
+        /* Object Field */
+        .object-field {
+            border: 1px solid #dee2e9;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+
+        .object-property {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid #dee2e9;
+        }
+
+        .object-property:last-child {
+            border-bottom: none;
+        }
+
+        .property-label {
+            flex: 0 0 140px;
+            font-weight: 500;
+            color: #273BEF;
+            background: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-right: 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .property-value {
+            flex: 1;
+        }
+
+        .property-input {
+            width: 100%;
+            border: 1px solid #dee2e9;
+            border-radius: 4px;
+            padding: 0.4rem;
+            font-size: 0.85rem;
+        }
+
+        .property-input:focus {
+            outline: none;
+            border-color: #273BEF;
+            box-shadow: 0 0 0 2px rgba(39, 59, 239, 0.1);
+        }
+
+        /* Array Field */
+        .array-field {
+            border: 1px solid #dee2e9;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+
+        .array-header {
+            padding: 0.5rem 0.75rem;
+            background: white;
+            border-bottom: 1px solid #dee2e9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+
+        .array-items {
+            padding: 0.25rem;
+        }
+
+        .array-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 6px;
+            border: 1px solid #dee2e9;
+        }
+
+        .array-item-input {
+            flex: 1;
+            border: 1px solid #dee2e9;
+            border-radius: 4px;
+            padding: 0.4rem;
+            font-size: 0.85rem;
+        }
+
+        .array-item-input:focus {
+            outline: none;
+            border-color: #273BEF;
+            box-shadow: 0 0 0 2px rgba(39, 59, 239, 0.1);
+        }
+
+        .remove-item {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.25rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .remove-item:hover {
+            background: #dc2626;
+        }
+
+        .add-item {
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .add-item:hover {
+            background: #059669;
+        }
+
+        /* Boolean Field */
+        .boolean-field {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .boolean-toggle {
+            position: relative;
+            width: 60px;
+            height: 32px;
+            background: #dee2e9;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .boolean-toggle.active {
+            background: #273BEF;
+        }
+
+        .boolean-toggle::after {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: left 0.3s ease;
+        }
+
+        .boolean-toggle.active::after {
+            left: 32px;
+        }
+
+        /* Loading and States */
+        .loading {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #000001;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #dee2e9;
+            border-top: 3px solid #273BEF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #ef4444;
+        }
+
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: #10b981;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            background: #ef4444;
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+
+            .result-header {
+                padding: 1.5rem;
+            }
+
+            .result-body {
+                padding: 1rem;
+            }
+
+            .object-property {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .property-label {
+                flex: none;
+                margin-right: 0;
+                margin-bottom: 0.5rem;
+            }
+
+            .result-meta {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .floating-save-btn {
+                bottom: 1rem;
+                right: 1rem;
+                padding: 0.8rem 1.2rem;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <img src="/static/logo.png" alt="Logo" class="logo">
+                <h1 class="page-title">
+                    <i class="fas fa-user-cog"></i> <span id="pageTitle">Agent Dashboard</span>
+                </h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn secondary" onclick="refreshData()">
+                    <i class="fas fa-refresh"></i> Refresh
+                </button>
+                <a href="/results" class="btn secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Results
+                </a>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading result data...</p>
+        </div>
+
+        <div class="error-state" id="errorState" style="display: none;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+            <h3>Error Loading Result</h3>
+            <p id="errorMessage">Failed to load the requested result.</p>
+        </div>
+
+        <div class="result-detail" id="resultDetail" style="display: none;">
+            <!-- Dynamic content will be generated here -->
+        </div>
+
+        <!-- Floating Save Button -->
+        <button class="floating-save-btn" onclick="saveChanges()" id="floatingSaveBtn">
+            <i class="fas fa-save"></i>
+            Save Changes
+        </button>
+    </div>
+
+    <script>
+        let currentResult = null;
+        let hasChanges = false;
+        let changeTracker = {};
+
+        // Load data on page load
+        window.addEventListener('load', function() {
+            // Initialize the modern sidebar
+            if (window.Sidebar) {
+                Sidebar.init();
+            }
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskId = urlParams.get('taskId');
+            
+            if (taskId) {
+                loadResult(taskId);
+            } else {
+                // Redirect to results page if no taskId
+                window.location.href = '/results';
+            }
+        });
+
+        async function loadResult(taskId) {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('errorState').style.display = 'none';
+                document.getElementById('resultDetail').style.display = 'none';
+                
+                const result = await API.get(`/api/saved-results/${taskId}`);
+                currentResult = result;
+                changeTracker = {};
+                hasChanges = false;
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('pageTitle').textContent = `Editing: ${result.filename}`;
+                
+                renderResult(result);
+                document.getElementById('resultDetail').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading result:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('errorState').style.display = 'block';
+                document.getElementById('errorMessage').textContent = error.message || 'Failed to load result';
+            }
+        }
+
+        function refreshData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskId = urlParams.get('taskId');
+            if (taskId) {
+                loadResult(taskId);
+            }
+        }
+
+        function renderResult(result) {
+            const container = document.getElementById('resultDetail');
+            
+            const date = new Date(result.completed_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            container.innerHTML = `
+                <div class="result-header">
+                    <div class="result-title">${result.filename}</div>
+                    <div class="result-meta">
+                        <span><i class="fas fa-calendar"></i> Completed: ${date}</span>
+                        <span><i class="fas fa-fingerprint"></i> ID: ${result.task_id}</span>
+                        <span><i class="fas fa-check-circle"></i> Status: ${result.status}</span>
+                    </div>
+                </div>
+                <div class="result-body">
+                    ${generateFieldsHTML(result.results, 'results')}
+                </div>
+            `;
+        }
+
+        function generateFieldsHTML(data, basePath = '') {
+            let html = '';
+            
+            for (const [key, value] of Object.entries(data)) {
+                const fieldPath = basePath ? `${basePath}.${key}` : key;
+                const fieldType = getFieldType(value);
+                const icon = getFieldIcon(key);
+                const isLargeField = key === 'transcript' || key === 'diarization_segments';
+                const isCollapsible = key === 'diarization_segments';
+                const fieldId = fieldPath.replace(/\./g, '-');
+                
+                html += `
+                    <div class="field-group ${isLargeField ? 'full-width' : ''}">
+                        <div class="field-header ${isCollapsible ? 'collapsible' : ''}" ${isCollapsible ? `onclick="toggleCollapse('${fieldId}')"` : ''}>
+                            <div class="field-title">
+                                <i class="${icon}"></i>
+                                ${formatFieldName(key)}
+                            </div>
+                            ${isCollapsible ? '<i class="fas fa-chevron-down collapse-icon" id="icon-' + fieldId + '"></i>' : ''}
+                        </div>
+                        <div class="field-content ${isCollapsible ? 'collapsible' : ''}" id="content-${fieldId}">
+                            ${generateFieldContent(fieldType, value, fieldPath, key)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return html;
+        }
+
+        function getFieldType(value) {
+            if (value === null || value === undefined) return 'text';
+            if (typeof value === 'string') return 'text';
+            if (typeof value === 'boolean') return 'boolean';
+            if (typeof value === 'number') return 'number';
+            if (Array.isArray(value)) return 'array';
+            if (typeof value === 'object') return 'object';
+            return 'text';
+        }
+
+        function getFieldIcon(key) {
+            const iconMap = {
+                'transcript': 'fas fa-file-alt',
+                'summary': 'fas fa-chart-line',
+                'keywords': 'fas fa-key',
+                'issues': 'fas fa-exclamation-triangle',
+                'categorisation': 'fas fa-tags',
+                'diarization_segments': 'fas fa-users',
+                'processing_steps': 'fas fa-cogs',
+                'metadata': 'fas fa-info-circle'
+            };
+            return iconMap[key] || 'fas fa-folder';
+        }
+
+        function formatFieldName(key) {
+            return key.split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+
+        function generateFieldContent(type, value, fieldPath, fieldKey = '') {
+            switch (type) {
+                case 'text':
+                    const isLargeText = fieldKey === 'transcript' || fieldKey === 'diarization_segments';
+                    const textClass = isLargeText ? 'text-field large' : 'text-field';
+                    return `<textarea class="${textClass}" onchange="trackChange('${fieldPath}', this.value)" placeholder="Enter text...">${value || ''}</textarea>`;
+                
+                case 'boolean':
+                    return `
+                        <div class="boolean-field">
+                            <div class="boolean-toggle ${value ? 'active' : ''}" onclick="toggleBoolean('${fieldPath}')"></div>
+                            <span>${value ? 'True' : 'False'}</span>
+                        </div>
+                    `;
+                
+                case 'number':
+                    return `<input type="number" class="property-input" value="${value || 0}" onchange="trackChange('${fieldPath}', parseFloat(this.value))" />`;
+                
+                case 'array':
+                    return generateArrayField(value, fieldPath);
+                
+                case 'object':
+                    return generateObjectField(value, fieldPath);
+                
+                default:
+                    const jsonClass = fieldKey === 'diarization_segments' ? 'text-field large' : 'text-field';
+                    return `<textarea class="${jsonClass}" onchange="trackChange('${fieldPath}', this.value)">${JSON.stringify(value, null, 2)}</textarea>`;
+            }
+        }
+
+        function generateArrayField(array, fieldPath) {
+            let html = `
+                <div class="array-field">
+                    <div class="array-header">
+                        <span>Items (${array.length})</span>
+                        <button class="add-item" onclick="addArrayItem('${fieldPath}')">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                    <div class="array-items" id="array-${fieldPath.replace(/\./g, '-')}">
+            `;
+            
+            array.forEach((item, index) => {
+                const itemType = getFieldType(item);
+                if (itemType === 'object') {
+                    html += `
+                        <div class="array-item">
+                            <div style="flex: 1;">
+                                ${generateObjectField(item, `${fieldPath}[${index}]`)}
+                            </div>
+                            <button class="remove-item" onclick="removeArrayItem('${fieldPath}', ${index})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="array-item">
+                            <input type="text" class="array-item-input" value="${item}" 
+                                   onchange="updateArrayItem('${fieldPath}', ${index}, this.value)" />
+                            <button class="remove-item" onclick="removeArrayItem('${fieldPath}', ${index})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        function generateObjectField(obj, fieldPath) {
+            let html = `<div class="object-field">`;
+            
+            for (const [key, value] of Object.entries(obj)) {
+                const propertyPath = `${fieldPath}.${key}`;
+                const valueType = getFieldType(value);
+                
+                html += `
+                    <div class="object-property">
+                        <div class="property-label">${formatFieldName(key)}</div>
+                        <div class="property-value">
+                            ${generateFieldContent(valueType, value, propertyPath, key)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            return html;
+        }
+
+        function trackChange(path, value) {
+            changeTracker[path] = value;
+            hasChanges = true;
+            updateSaveButton();
+        }
+
+        function toggleBoolean(path) {
+            const currentValue = getValueFromPath(currentResult, path);
+            const newValue = !currentValue;
+            
+            trackChange(path, newValue);
+            
+            // Update UI
+            const toggle = event.target;
+            if (newValue) {
+                toggle.classList.add('active');
+                toggle.nextElementSibling.textContent = 'True';
+            } else {
+                toggle.classList.remove('active');
+                toggle.nextElementSibling.textContent = 'False';
+            }
+        }
+
+        function addArrayItem(path) {
+            const currentArray = getValueFromPath(currentResult, path) || [];
+            const newArray = [...currentArray, ''];
+            
+            // Update the data immediately
+            setValueAtPath(currentResult, path, newArray);
+            trackChange(path, newArray);
+            
+            // Re-render the array field
+            reRenderArrayField(path);
+        }
+
+        function removeArrayItem(path, index) {
+            const currentArray = getValueFromPath(currentResult, path) || [];
+            const newArray = currentArray.filter((_, i) => i !== index);
+            
+            // Update the data immediately
+            setValueAtPath(currentResult, path, newArray);
+            trackChange(path, newArray);
+            
+            // Re-render the array field
+            reRenderArrayField(path);
+        }
+
+        function updateArrayItem(path, index, value) {
+            const currentArray = getValueFromPath(currentResult, path) || [];
+            const newArray = [...currentArray];
+            newArray[index] = value;
+            
+            // Update the data immediately
+            setValueAtPath(currentResult, path, newArray);
+            trackChange(path, newArray);
+        }
+
+        function reRenderArrayField(path) {
+            const container = document.getElementById(`array-${path.replace(/\./g, '-')}`);
+            if (!container) return;
+            
+            const parentField = container.closest('.field-content');
+            const fieldKey = path.split('.').pop();
+            const currentValue = getValueFromPath(currentResult, path);
+            
+            // Generate new content
+            const newContent = generateFieldContent('array', currentValue, path, fieldKey);
+            parentField.innerHTML = newContent;
+        }
+
+        function getValueFromPath(obj, path) {
+            return path.split('.').reduce((current, key) => {
+                if (key.includes('[') && key.includes(']')) {
+                    const [arrayKey, indexStr] = key.split('[');
+                    const index = parseInt(indexStr.replace(']', ''));
+                    return current?.[arrayKey]?.[index];
+                }
+                return current?.[key];
+            }, obj);
+        }
+
+        function setValueAtPath(obj, path, value) {
+            const keys = path.split('.');
+            let current = obj;
+            
+            for (let i = 0; i < keys.length - 1; i++) {
+                const key = keys[i];
+                if (key.includes('[') && key.includes(']')) {
+                    const [arrayKey, indexStr] = key.split('[');
+                    const index = parseInt(indexStr.replace(']', ''));
+                    if (!current[arrayKey]) current[arrayKey] = [];
+                    if (!current[arrayKey][index]) current[arrayKey][index] = {};
+                    current = current[arrayKey][index];
+                } else {
+                    if (!current[key]) current[key] = {};
+                    current = current[key];
+                }
+            }
+            
+            const finalKey = keys[keys.length - 1];
+            if (finalKey.includes('[') && finalKey.includes(']')) {
+                const [arrayKey, indexStr] = finalKey.split('[');
+                const index = parseInt(indexStr.replace(']', ''));
+                if (!current[arrayKey]) current[arrayKey] = [];
+                current[arrayKey][index] = value;
+            } else {
+                current[finalKey] = value;
+            }
+        }
+
+        function updateSaveButton() {
+            const floatingSaveBtn = document.getElementById('floatingSaveBtn');
+            if (hasChanges) {
+                floatingSaveBtn.classList.add('show');
+            } else {
+                floatingSaveBtn.classList.remove('show');
+            }
+        }
+
+        async function saveChanges() {
+            try {
+                // Apply all changes to the current result
+                const updatedResult = JSON.parse(JSON.stringify(currentResult));
+                
+                for (const [path, value] of Object.entries(changeTracker)) {
+                    setValueAtPath(updatedResult, path, value);
+                }
+
+                // Send to server
+                const response = await fetch(`/api/saved-results/${currentResult.task_id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updatedResult)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save changes');
+                }
+
+                // Update current result and reset changes
+                currentResult = updatedResult;
+                changeTracker = {};
+                hasChanges = false;
+                updateSaveButton();
+                
+                showToast('Changes saved successfully');
+
+            } catch (error) {
+                console.error('Error saving changes:', error);
+                showToast('Failed to save changes', 'error');
+            }
+        }
+
+        function toggleCollapse(fieldId) {
+            const content = document.getElementById(`content-${fieldId}`);
+            const icon = document.getElementById(`icon-${fieldId}`);
+            
+            if (content && icon) {
+                const isExpanded = content.classList.contains('expanded');
+                
+                if (isExpanded) {
+                    content.classList.remove('expanded');
+                    icon.classList.remove('expanded');
+                } else {
+                    content.classList.add('expanded');
+                    icon.classList.add('expanded');
+                }
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check' : 'exclamation-triangle'}"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+    </script>
+    <script src="/static/sidebar.js?v=2.0"></script>
+</body>
+</html>

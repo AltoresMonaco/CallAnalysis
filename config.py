@@ -1,3 +1,4 @@
+# config.py
 """
 Environment-aware configuration for Audio Transcription API
 Safely detects GPU availability and adjusts settings accordingly

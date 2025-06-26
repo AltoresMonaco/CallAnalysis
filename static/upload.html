@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Transcript Analysis</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="/static/sidebar.css" rel="stylesheet">
+    <link href="/static/sidebar.css?v=2.0" rel="stylesheet">
     <script src="/static/utils.js"></script>
     <style>
         * {
@@ -715,10 +715,14 @@
             <div class="header-content">
                 <h1>Audio Transcript Analysis</h1>
                 <p>AI-powered transcription and call analysis</p>
-                <!-- Temporary test button -->
-                <button onclick="openSettings()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #273BEF; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                    🔧 Test Settings (Direct)
-                </button>
+                <div style="margin-top: 1rem;">
+                    <a href="/" style="color: #273BEF; text-decoration: none; font-weight: 500; margin-right: 1rem;">
+                        <i class="fas fa-chart-line"></i> Back to Dashboard
+                    </a>
+                    <button onclick="openSettings()" style="padding: 0.5rem 1rem; background: #273BEF; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                        🔧 Test Settings (Direct)
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1057,26 +1061,50 @@
                 const resultsContainer = document.getElementById('results');
                 resultsContainer.style.display = 'block';
                 
-                // Show transcript if available
-                if (results.transcript) {
-                    document.getElementById('transcriptContent').textContent = results.transcript;
+                // Show transcript if available (could be from different step names)
+                const transcriptResult = results.transcript || results.transcription;
+                if (transcriptResult) {
+                    document.getElementById('transcriptContent').textContent = 
+                        typeof transcriptResult === 'string' ? transcriptResult : 
+                        transcriptResult.text || JSON.stringify(transcriptResult, null, 2);
                 }
                 
-                // Show analysis results for full mode
+                // Show analysis results for full mode - dynamically handle all results
                 if (this.currentTask.mode === 'full') {
-                    if (results.summary) {
-                        document.getElementById('summaryContent').textContent = JSON.stringify(results.summary, null, 2);
-                        document.getElementById('summarySection').style.display = 'block';
-                    }
+                    // Hide all analysis sections first
+                    document.getElementById('summarySection').style.display = 'none';
+                    document.getElementById('issuesSection').style.display = 'none';
+                    document.getElementById('categorisationSection').style.display = 'none';
                     
-                    if (results.issues) {
-                        document.getElementById('issuesContent').textContent = JSON.stringify(results.issues, null, 2);
-                        document.getElementById('issuesSection').style.display = 'block';
-                    }
+                    // Map result keys to sections
+                    const resultMapping = {
+                        'summary': 'summarySection',
+                        'qualification': 'summarySection',
+                        'issues': 'issuesSection', 
+                        'critical_issues': 'issuesSection',
+                        'categorisation': 'categorisationSection',
+                        'categorization': 'categorisationSection'
+                    };
                     
-                    if (results.categorisation) {
-                        document.getElementById('categorisationContent').textContent = JSON.stringify(results.categorisation, null, 2);
-                        document.getElementById('categorisationSection').style.display = 'block';
+                    // Show results that are available
+                    for (const [resultKey, resultData] of Object.entries(results)) {
+                        if (resultKey === 'transcript' || resultKey === 'transcription') continue;
+                        
+                        const sectionId = resultMapping[resultKey];
+                        if (sectionId) {
+                            const contentId = sectionId.replace('Section', 'Content');
+                            const contentElement = document.getElementById(contentId);
+                            const sectionElement = document.getElementById(sectionId);
+                            
+                            if (contentElement && sectionElement) {
+                                contentElement.textContent = typeof resultData === 'string' ? 
+                                    resultData : JSON.stringify(resultData, null, 2);
+                                sectionElement.style.display = 'block';
+                                console.log(`[TaskTracker] Displayed result: ${resultKey}`);
+                            }
+                        } else {
+                            console.log(`[TaskTracker] No section mapping for result: ${resultKey}`);
+                        }
                     }
                 }
                 
@@ -1107,26 +1135,23 @@
         let currentMode = 'full';
         const taskTracker = new TaskTracker();
 
-        // Progress steps configuration
-        const progressSteps = {
-            full: [
-                { id: 'transcription', title: 'Audio Transcription', icon: 'fas fa-microphone' },
-                { id: 'qualification', title: 'Call Qualification & Analysis', icon: 'fas fa-chart-line' },
-                { id: 'critical_issues', title: 'Critical Issues Analysis', icon: 'fas fa-exclamation-triangle' },
-                { id: 'categorisation', title: 'Call Categorization', icon: 'fas fa-tags' }
-            ],
-            transcribe: [
-                { id: 'transcription', title: 'Audio Transcription', icon: 'fas fa-microphone' }
-            ]
+        // Progress steps configuration - will be loaded from backend
+        let progressSteps = {
+            full: [],
+            transcribe: []
         };
 
         // === EVENT HANDLERS ===
         window.addEventListener('load', async () => {
             console.log('[Main] Page loaded, initializing...');
             await loadSettings();
+            await loadStepsConfiguration();
             
             console.log('[Main] About to initialize sidebar...');
-            Sidebar.init();
+            // Initialize the modern sidebar
+            if (window.Sidebar) {
+                Sidebar.init();
+            }
             console.log('[Main] Sidebar initialized');
             
             // Check if we should open settings automatically
@@ -1243,6 +1268,73 @@
             }
         }
 
+        // === CONFIGURATION FUNCTIONS ===
+        async function loadStepsConfiguration() {
+            try {
+                console.log('[Config] Loading steps configuration...');
+                const response = await API.get('/api/steps');
+                const steps = response.steps;
+                
+                // Convert steps to progress format
+                const enabledSteps = Object.values(steps)
+                    .filter(step => step.enabled)
+                    .sort((a, b) => a.order - b.order);
+                
+                console.log('[Config] Enabled steps:', enabledSteps.map(s => `${s.step_id} (${s.step_type}, order ${s.order})`));
+                
+                // Build progress steps for different modes
+                progressSteps.full = enabledSteps.map(step => ({
+                    id: step.step_id,
+                    title: step.name,
+                    icon: getStepIcon(step),
+                    type: step.step_type,
+                    order: step.order
+                }));
+                
+                // For transcribe-only mode, only include audio steps that produce transcript
+                progressSteps.transcribe = enabledSteps
+                    .filter(step => step.step_type === 'audio')
+                    .map(step => ({
+                        id: step.step_id,
+                        title: step.name,
+                        icon: getStepIcon(step),
+                        type: step.step_type,
+                        order: step.order
+                    }));
+                
+                console.log('[Config] Full mode steps:', progressSteps.full.length);
+                console.log('[Config] Transcribe mode steps:', progressSteps.transcribe.length);
+                
+            } catch (error) {
+                console.error('[Config] Failed to load steps configuration:', error);
+                // Fallback to basic steps if loading fails
+                progressSteps.full = [
+                    { id: 'transcription', title: 'Audio Processing', icon: 'fas fa-microphone', type: 'audio', order: 1 }
+                ];
+                progressSteps.transcribe = [
+                    { id: 'transcription', title: 'Audio Processing', icon: 'fas fa-microphone', type: 'audio', order: 1 }
+                ];
+            }
+        }
+
+        function getStepIcon(step) {
+            // Map step types and IDs to appropriate icons
+            if (step.step_type === 'audio') {
+                if (step.step_id.includes('transcription')) return 'fas fa-microphone';
+                if (step.step_id.includes('diarization')) return 'fas fa-users';
+                if (step.step_id.includes('language')) return 'fas fa-language';
+                if (step.step_id.includes('loading')) return 'fas fa-file-audio';
+                return 'fas fa-volume-up';
+            } else {
+                // LLM steps
+                if (step.step_id.includes('qualification') || step.step_id.includes('summary')) return 'fas fa-chart-line';
+                if (step.step_id.includes('issues') || step.step_id.includes('critical')) return 'fas fa-exclamation-triangle';
+                if (step.step_id.includes('categor')) return 'fas fa-tags';
+                if (step.step_id.includes('sentiment')) return 'fas fa-heart';
+                return 'fas fa-brain';
+            }
+        }
+
         // === SETTINGS FUNCTIONS ===
         async function loadSettings() {
             try {
@@ -1324,6 +1416,6 @@
             }
         });
     </script>
-    <script src="/static/sidebar.js"></script>
+    <script src="/static/sidebar.js?v=2.0"></script>
 </body>
 </html>

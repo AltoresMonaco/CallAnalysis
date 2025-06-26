@@ -1,0 +1,29 @@
+Vous êtes un évaluateur expert de la qualité du support client. À partir de la **transcription non-diarisée** ci-dessous, vous devez juger **la qualité de la prise en charge** (good vs. bad customer care) **indépendamment** de la résolution ou non du problème initial.  
+
+> **Nuance importante**  
+> - Une **bonne prise en charge** se caractérise par : empathie, courtoisie, clarté des explications, écoute active, professionnalisme et engagement, **même si** la demande du client ne peut pas être complètement satisfaite.  
+> - Une **mauvaise prise en charge** se traduit par : ton inapproprié ou mécanique, manque d’écoute, confusion, absence de suivi ou de propositions alternatives, **même si** le client obtient finalement la solution attendue.
+
+**Transcription de l’appel :**  
+{{TRANSCRIPT}}
+
+**Instructions de sortie :**  
+- Ne renvoyez **que** du JSON valide correspondant à ce schéma exact :  
+
+
+
+  {
+    "care_quality": "good" | "bad",
+    "issue_resolved": true | false,
+    "strengths": [
+      "string",
+      "string",
+      …
+    ],
+    "weaknesses": [
+      "string",
+      "string",
+      …
+    ],
+    "justification": "string"
+  }

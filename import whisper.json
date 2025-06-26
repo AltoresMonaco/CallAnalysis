@@ -12,7 +12,7 @@ PROMPT_QUALIFICATION = """
 Dans le cadre de cet appel, fournit moi un JSON :
 
 - Le résumé de l’appel en 4 à 6 phrases ("summary")
-- La qualification de l’appel ("isPositive?" -> true/false)
+- La qualification de l’appel ("isPositive" -> true/false)
 - La détection de la réitération en numéraire ("hasVisitedShop", "technicianVisitedCustomer", "previousCalls")
 
 Critères positifs :
